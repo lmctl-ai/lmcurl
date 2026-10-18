@@ -11,6 +11,11 @@
   the bytecode nor the lmscript `--dry-run` PLAN contain the key; the test greps the bytecode for the key.
 - **2026-10-18, errors in three places and three exit codes:** compiler (2, located), host validation and HTTP transport failures
   (3), application failures the chunk decides on with `out.fail` (4). HTTP statuses are data (`ok()`, `status()`), not errors.
+- **2026-10-18, spec v4 S0 adopted (A02/A03):** registrations are typed (`register_schema` passes each signature's parameter and
+  return type names so `Registry::signatures()` is diffed against `lmscript --dsl-signatures`); no call-time checks follow from the
+  types (R33/R34). stdout is exactly one JSON result line: `out.print` lines are collected into `result.output` instead of being
+  printed live, `out.fail` messages become one APP_FAIL line (exit 4), load refusals are `phase load` and host/VM failures `phase
+  run` (exit 3, formerly 1 for load). Human diagnostics stay on stderr. Bytecode stays v3.
 - **2026-10-18, mirror rules:** breadth-first, same host and port, content-type prefixes (`allow`), depth = link hops, each URL once
   (`?query` variants are distinct URLs mapping to the same file), `out_dir/host[_port]/segments` with `index.html` for directories,
   `..`/`.` neutralized, fragments dropped, `mailto:`/`javascript:`/`data:` ignored; 404 counts as failed, not as an error.

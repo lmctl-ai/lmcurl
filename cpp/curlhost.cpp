@@ -19,7 +19,7 @@ struct Request { std::string method = "GET", url, body; std::vector<std::pair<st
 struct Response { http::Response r; };
 struct Mirror { std::string start, outDir = "mirror"; int depth = 1, maxPages = 100, delayMs = 0; size_t maxBytes = 4u * 1024u * 1024u; bool sameHost = true; std::vector<std::string> allow; };
 struct MirrorResult { int pages = 0, skipped = 0, failed = 0; long bytes = 0; };
-struct Output { int failures = 0; };
+struct Output { std::vector<std::string> lines; std::vector<std::string> failures; };  // out.print lines and out.fail messages, reported once at the end
 struct Arena { std::vector<std::unique_ptr<Request>> requests; std::vector<std::unique_ptr<Response>> responses; std::vector<std::unique_ptr<Mirror>> mirrors; std::vector<std::unique_ptr<MirrorResult>> results; };
 
 // ---- minimal JSON: path lookup "choices.0.message.content" over a parsed tree (strings, numbers, bools, null, arrays, objects) ----
@@ -140,6 +140,65 @@ MirrorResult run_mirror(const Mirror& m, Output&, std::ostream& log) {
   return res;
 }
 
+// (1) The registry: the implementation of schema/curl.dsl.json, declared with the schema's types so `--dsl-signatures`
+// can be diffed against `lmscript --dsl-signatures schema/curl.dsl.json` (spec v4 S0, A02). The types are declarations
+// only: the compiler checked every call, the VM trusts the bytecode (R33/R34).
+void register_schema(dslvm::Registry& reg, Arena& arena, Output& output) {
+  reg.context("out", "Output");
+  auto req = [](void* p) { return static_cast<Request*>(p); }; auto self = [](void* p) { return dslvm::Value::object("Request", p); };
+  reg.function("request", {}, "Request", [&](dslvm::Args&) { arena.requests.push_back(std::make_unique<Request>()); return dslvm::Value::object("Request", arena.requests.back().get()); });
+  reg.method("Request", "method", {"string"}, "Request", [&](void* p, dslvm::Args& a) { std::string m = a[0].s; for (auto& c : m) c = char(std::toupper(static_cast<unsigned char>(c))); if (m != "GET" && m != "POST" && m != "PUT" && m != "PATCH" && m != "DELETE" && m != "HEAD") throw dslvm::Error("Request.method: unsupported method '" + a[0].s + "'"); req(p)->method = m; return self(p); });
+  reg.method("Request", "url", {"string"}, "Request", [&](void* p, dslvm::Args& a) { http::parse_url(a[0].s); req(p)->url = a[0].s; return self(p); });
+  reg.method("Request", "header", {"string", "string"}, "Request", [&](void* p, dslvm::Args& a) { if (a[0].s.empty() || a[0].s.find_first_of(":\r\n") != std::string::npos || a[1].s.find_first_of("\r\n") != std::string::npos) throw dslvm::Error("Request.header: invalid header name or value"); req(p)->headers.emplace_back(a[0].s, a[1].s); return self(p); });
+  reg.method("Request", "body", {"string"}, "Request", [&](void* p, dslvm::Args& a) { req(p)->body = a[0].s; return self(p); });
+  reg.method("Request", "timeout_ms", {"int"}, "Request", [&](void* p, dslvm::Args& a) { if (a[0].i <= 0) throw dslvm::Error("Request.timeout_ms must be positive"); req(p)->opt.timeoutMs = a[0].i; return self(p); });
+  reg.method("Request", "max_bytes", {"int"}, "Request", [&](void* p, dslvm::Args& a) { if (a[0].i <= 0) throw dslvm::Error("Request.max_bytes must be positive"); req(p)->opt.maxBytes = size_t(a[0].i); return self(p); });
+  reg.method("Request", "max_redirects", {"int"}, "Request", [&](void* p, dslvm::Args& a) { if (a[0].i < 0) throw dslvm::Error("Request.max_redirects must not be negative"); req(p)->opt.maxRedirects = a[0].i; return self(p); });
+  reg.method("Request", "send", {}, "Response", [&](void* p, dslvm::Args&) {
+    Request& r = *req(p); if (r.url.empty()) throw dslvm::Error("Request.send: url(...) was not set");
+    arena.responses.push_back(std::make_unique<Response>());
+    try { arena.responses.back()->r = http::fetch(r.url, r.method, r.headers, r.body, r.opt); } catch (const http::Error& e) { throw dslvm::Error("Request.send " + r.method + " " + r.url + ": " + e.what()); }
+    return dslvm::Value::object("Response", arena.responses.back().get());
+  });
+  auto resp = [](void* p) { return &static_cast<Response*>(p)->r; };
+  reg.method("Response", "status", {}, "int", [&](void* p, dslvm::Args&) { return dslvm::Value::integer(resp(p)->status); });
+  reg.method("Response", "ok", {}, "bool", [&](void* p, dslvm::Args&) { return dslvm::Value::boolean(resp(p)->status >= 200 && resp(p)->status < 300); });
+  reg.method("Response", "body", {}, "string", [&](void* p, dslvm::Args&) { return dslvm::Value::string(resp(p)->body); });
+  reg.method("Response", "header", {"string"}, "string", [&](void* p, dslvm::Args& a) { return dslvm::Value::string(resp(p)->header(a[0].s)); });
+  auto jsonAt = [&](void* p, const std::string& path, std::string& why) -> const Json* { static std::map<void*, Json> cache; auto it = cache.find(p); if (it == cache.end()) { try { it = cache.emplace(p, JsonParser(resp(p)->body).parse()).first; } catch (const dslvm::Error& e) { why = e.what(); return nullptr; } } return lookup(it->second, path, why); };
+  reg.method("Response", "has_json", {"string"}, "bool", [&](void* p, dslvm::Args& a) { std::string why; return dslvm::Value::boolean(jsonAt(p, a[0].s, why) != nullptr); });
+  reg.method("Response", "json_text", {"string"}, "string", [&](void* p, dslvm::Args& a) {
+    std::string why; const Json* v = jsonAt(p, a[0].s, why); if (!v) throw dslvm::Error("Response.json_text(\"" + a[0].s + "\"): " + why);
+    if (v->kind == Json::STR || v->kind == Json::NUM) return dslvm::Value::string(v->s);
+    if (v->kind == Json::BOOL) return dslvm::Value::string(v->b ? "true" : "false");
+    if (v->kind == Json::NUL) return dslvm::Value::string("null");
+    throw dslvm::Error("Response.json_text(\"" + a[0].s + "\"): the value is " + (v->kind == Json::ARR ? "an array" : "an object") + ", not a scalar");
+  });
+  auto mir = [](void* p) { return static_cast<Mirror*>(p); }; auto mself = [](void* p) { return dslvm::Value::object("Mirror", p); };
+  reg.function("mirror", {}, "Mirror", [&](dslvm::Args&) { arena.mirrors.push_back(std::make_unique<Mirror>()); return dslvm::Value::object("Mirror", arena.mirrors.back().get()); });
+  reg.method("Mirror", "start", {"string"}, "Mirror", [&](void* p, dslvm::Args& a) { http::parse_url(a[0].s); mir(p)->start = a[0].s; return mself(p); });
+  reg.method("Mirror", "depth", {"int"}, "Mirror", [&](void* p, dslvm::Args& a) { if (a[0].i < 0 || a[0].i > 10) throw dslvm::Error("Mirror.depth must be 0..10"); mir(p)->depth = a[0].i; return mself(p); });
+  reg.method("Mirror", "same_host", {"bool"}, "Mirror", [&](void* p, dslvm::Args& a) { mir(p)->sameHost = a[0].b; return mself(p); });
+  reg.method("Mirror", "allow", {"string"}, "Mirror", [&](void* p, dslvm::Args& a) { mir(p)->allow.push_back(a[0].s); return mself(p); });
+  reg.method("Mirror", "out_dir", {"string"}, "Mirror", [&](void* p, dslvm::Args& a) { if (a[0].s.empty()) throw dslvm::Error("Mirror.out_dir must not be empty"); mir(p)->outDir = a[0].s; return mself(p); });
+  reg.method("Mirror", "max_pages", {"int"}, "Mirror", [&](void* p, dslvm::Args& a) { if (a[0].i <= 0) throw dslvm::Error("Mirror.max_pages must be positive"); mir(p)->maxPages = a[0].i; return mself(p); });
+  reg.method("Mirror", "max_bytes", {"int"}, "Mirror", [&](void* p, dslvm::Args& a) { if (a[0].i <= 0) throw dslvm::Error("Mirror.max_bytes must be positive"); mir(p)->maxBytes = size_t(a[0].i); return mself(p); });
+  reg.method("Mirror", "delay_ms", {"int"}, "Mirror", [&](void* p, dslvm::Args& a) { if (a[0].i < 0) throw dslvm::Error("Mirror.delay_ms must not be negative"); mir(p)->delayMs = a[0].i; return mself(p); });
+  reg.method("Mirror", "run", {}, "MirrorResult", [&](void* p, dslvm::Args&) { arena.results.push_back(std::make_unique<MirrorResult>(run_mirror(*mir(p), output, std::cerr))); return dslvm::Value::object("MirrorResult", arena.results.back().get()); });
+  auto mr = [](void* p) { return static_cast<MirrorResult*>(p); };
+  reg.method("MirrorResult", "pages", {}, "int", [&](void* p, dslvm::Args&) { return dslvm::Value::integer(mr(p)->pages); });
+  reg.method("MirrorResult", "skipped", {}, "int", [&](void* p, dslvm::Args&) { return dslvm::Value::integer(mr(p)->skipped); });
+  reg.method("MirrorResult", "failed", {}, "int", [&](void* p, dslvm::Args&) { return dslvm::Value::integer(mr(p)->failed); });
+  reg.method("MirrorResult", "bytes", {}, "int", [&](void* p, dslvm::Args&) { return dslvm::Value::integer(int32_t(mr(p)->bytes)); });
+  reg.method("Output", "print", {"string"}, "void", [&](void* p, dslvm::Args& a) { static_cast<Output*>(p)->lines.push_back(a[0].s); return dslvm::Value::none(); });
+  reg.method("Output", "write_file", {"string", "string"}, "void", [&](void*, dslvm::Args& a) { std::ofstream f(a[0].s, std::ios::binary); if (!f) throw dslvm::Error("Output.write_file: cannot write " + a[0].s); f << a[1].s; return dslvm::Value::none(); });
+  reg.method("Output", "fail", {"string"}, "void", [&](void* p, dslvm::Args& a) { std::cerr << "fail: " << a[0].s << "\n"; static_cast<Output*>(p)->failures.push_back(a[0].s); return dslvm::Value::none(); });
+  reg.function("env", {"string"}, "string", [&](dslvm::Args& a) { const char* v = std::getenv(a[0].s.c_str()); if (!v) throw dslvm::Error("env: " + a[0].s + " is not set in the host environment (test with has_env)"); return dslvm::Value::string(v); });
+  reg.function("has_env", {"string"}, "bool", [&](dslvm::Args& a) { return dslvm::Value::boolean(std::getenv(a[0].s.c_str()) != nullptr); });
+  reg.function("json_escape", {"string"}, "string", [&](dslvm::Args& a) { return dslvm::Value::string(json_escape(a[0].s)); });
+  (void)output;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -148,79 +207,34 @@ int main(int argc, char** argv) {
     std::string a = argv[i];
     auto value = [&](const char* flag) { if (i + 1 >= argc) { std::cerr << "error: " << flag << " needs a value\n"; std::exit(2); } return std::string(argv[++i]); };
     if (a == "--dsl") dslPath = value("--dsl"); else if (a == "--schema") schemaPath = value("--schema");
-    else { std::cerr << "usage: curlhost --dsl FILE --schema FILE\n"; return 2; }
+    else if (a == "--dsl-signatures") { Arena pa; Output po; dslvm::Registry preg; register_schema(preg, pa, po); for (const auto& s : preg.signatures()) std::cout << s << "\n"; return 0; }
+    else { std::cerr << "usage: curlhost --dsl FILE --schema FILE | --dsl-signatures\n"; return 2; }
   }
   if (dslPath.empty() || schemaPath.empty()) { std::cerr << "error: --dsl FILE and --schema FILE are required\n"; return 2; }
 
-  // (1) The host starts and initializes its registry: the implementation of schema/curl.dsl.json.
   Arena arena; Output output;
   dslvm::Registry reg;
-  reg.context("out", "Output");
-  auto req = [](void* p) { return static_cast<Request*>(p); }; auto self = [](void* p) { return dslvm::Value::object("Request", p); };
-  reg.function("request", 0, [&](dslvm::Args&) { arena.requests.push_back(std::make_unique<Request>()); return dslvm::Value::object("Request", arena.requests.back().get()); });
-  reg.method("Request", "method", 1, [&](void* p, dslvm::Args& a) { std::string m = a[0].s; for (auto& c : m) c = char(std::toupper(static_cast<unsigned char>(c))); if (m != "GET" && m != "POST" && m != "PUT" && m != "PATCH" && m != "DELETE" && m != "HEAD") throw dslvm::Error("Request.method: unsupported method '" + a[0].s + "'"); req(p)->method = m; return self(p); });
-  reg.method("Request", "url", 1, [&](void* p, dslvm::Args& a) { http::parse_url(a[0].s); req(p)->url = a[0].s; return self(p); });
-  reg.method("Request", "header", 2, [&](void* p, dslvm::Args& a) { if (a[0].s.empty() || a[0].s.find_first_of(":\r\n") != std::string::npos || a[1].s.find_first_of("\r\n") != std::string::npos) throw dslvm::Error("Request.header: invalid header name or value"); req(p)->headers.emplace_back(a[0].s, a[1].s); return self(p); });
-  reg.method("Request", "body", 1, [&](void* p, dslvm::Args& a) { req(p)->body = a[0].s; return self(p); });
-  reg.method("Request", "timeout_ms", 1, [&](void* p, dslvm::Args& a) { if (a[0].i <= 0) throw dslvm::Error("Request.timeout_ms must be positive"); req(p)->opt.timeoutMs = a[0].i; return self(p); });
-  reg.method("Request", "max_bytes", 1, [&](void* p, dslvm::Args& a) { if (a[0].i <= 0) throw dslvm::Error("Request.max_bytes must be positive"); req(p)->opt.maxBytes = size_t(a[0].i); return self(p); });
-  reg.method("Request", "max_redirects", 1, [&](void* p, dslvm::Args& a) { if (a[0].i < 0) throw dslvm::Error("Request.max_redirects must not be negative"); req(p)->opt.maxRedirects = a[0].i; return self(p); });
-  reg.method("Request", "send", 0, [&](void* p, dslvm::Args&) {
-    Request& r = *req(p); if (r.url.empty()) throw dslvm::Error("Request.send: url(...) was not set");
-    arena.responses.push_back(std::make_unique<Response>());
-    try { arena.responses.back()->r = http::fetch(r.url, r.method, r.headers, r.body, r.opt); } catch (const http::Error& e) { throw dslvm::Error("Request.send " + r.method + " " + r.url + ": " + e.what()); }
-    return dslvm::Value::object("Response", arena.responses.back().get());
-  });
-  auto resp = [](void* p) { return &static_cast<Response*>(p)->r; };
-  reg.method("Response", "status", 0, [&](void* p, dslvm::Args&) { return dslvm::Value::integer(resp(p)->status); });
-  reg.method("Response", "ok", 0, [&](void* p, dslvm::Args&) { return dslvm::Value::boolean(resp(p)->status >= 200 && resp(p)->status < 300); });
-  reg.method("Response", "body", 0, [&](void* p, dslvm::Args&) { return dslvm::Value::string(resp(p)->body); });
-  reg.method("Response", "header", 1, [&](void* p, dslvm::Args& a) { return dslvm::Value::string(resp(p)->header(a[0].s)); });
-  auto jsonAt = [&](void* p, const std::string& path, std::string& why) -> const Json* { static std::map<void*, Json> cache; auto it = cache.find(p); if (it == cache.end()) { try { it = cache.emplace(p, JsonParser(resp(p)->body).parse()).first; } catch (const dslvm::Error& e) { why = e.what(); return nullptr; } } return lookup(it->second, path, why); };
-  reg.method("Response", "has_json", 1, [&](void* p, dslvm::Args& a) { std::string why; return dslvm::Value::boolean(jsonAt(p, a[0].s, why) != nullptr); });
-  reg.method("Response", "json_text", 1, [&](void* p, dslvm::Args& a) {
-    std::string why; const Json* v = jsonAt(p, a[0].s, why); if (!v) throw dslvm::Error("Response.json_text(\"" + a[0].s + "\"): " + why);
-    if (v->kind == Json::STR || v->kind == Json::NUM) return dslvm::Value::string(v->s);
-    if (v->kind == Json::BOOL) return dslvm::Value::string(v->b ? "true" : "false");
-    if (v->kind == Json::NUL) return dslvm::Value::string("null");
-    throw dslvm::Error("Response.json_text(\"" + a[0].s + "\"): the value is " + (v->kind == Json::ARR ? "an array" : "an object") + ", not a scalar");
-  });
-  auto mir = [](void* p) { return static_cast<Mirror*>(p); }; auto mself = [](void* p) { return dslvm::Value::object("Mirror", p); };
-  reg.function("mirror", 0, [&](dslvm::Args&) { arena.mirrors.push_back(std::make_unique<Mirror>()); return dslvm::Value::object("Mirror", arena.mirrors.back().get()); });
-  reg.method("Mirror", "start", 1, [&](void* p, dslvm::Args& a) { http::parse_url(a[0].s); mir(p)->start = a[0].s; return mself(p); });
-  reg.method("Mirror", "depth", 1, [&](void* p, dslvm::Args& a) { if (a[0].i < 0 || a[0].i > 10) throw dslvm::Error("Mirror.depth must be 0..10"); mir(p)->depth = a[0].i; return mself(p); });
-  reg.method("Mirror", "same_host", 1, [&](void* p, dslvm::Args& a) { mir(p)->sameHost = a[0].b; return mself(p); });
-  reg.method("Mirror", "allow", 1, [&](void* p, dslvm::Args& a) { mir(p)->allow.push_back(a[0].s); return mself(p); });
-  reg.method("Mirror", "out_dir", 1, [&](void* p, dslvm::Args& a) { if (a[0].s.empty()) throw dslvm::Error("Mirror.out_dir must not be empty"); mir(p)->outDir = a[0].s; return mself(p); });
-  reg.method("Mirror", "max_pages", 1, [&](void* p, dslvm::Args& a) { if (a[0].i <= 0) throw dslvm::Error("Mirror.max_pages must be positive"); mir(p)->maxPages = a[0].i; return mself(p); });
-  reg.method("Mirror", "max_bytes", 1, [&](void* p, dslvm::Args& a) { if (a[0].i <= 0) throw dslvm::Error("Mirror.max_bytes must be positive"); mir(p)->maxBytes = size_t(a[0].i); return mself(p); });
-  reg.method("Mirror", "delay_ms", 1, [&](void* p, dslvm::Args& a) { if (a[0].i < 0) throw dslvm::Error("Mirror.delay_ms must not be negative"); mir(p)->delayMs = a[0].i; return mself(p); });
-  reg.method("Mirror", "run", 0, [&](void* p, dslvm::Args&) { arena.results.push_back(std::make_unique<MirrorResult>(run_mirror(*mir(p), output, std::cerr))); return dslvm::Value::object("MirrorResult", arena.results.back().get()); });
-  auto mr = [](void* p) { return static_cast<MirrorResult*>(p); };
-  reg.method("MirrorResult", "pages", 0, [&](void* p, dslvm::Args&) { return dslvm::Value::integer(mr(p)->pages); });
-  reg.method("MirrorResult", "skipped", 0, [&](void* p, dslvm::Args&) { return dslvm::Value::integer(mr(p)->skipped); });
-  reg.method("MirrorResult", "failed", 0, [&](void* p, dslvm::Args&) { return dslvm::Value::integer(mr(p)->failed); });
-  reg.method("MirrorResult", "bytes", 0, [&](void* p, dslvm::Args&) { return dslvm::Value::integer(int32_t(mr(p)->bytes)); });
-  reg.method("Output", "print", 1, [&](void*, dslvm::Args& a) { std::cout << a[0].s << "\n"; return dslvm::Value::none(); });
-  reg.method("Output", "write_file", 2, [&](void*, dslvm::Args& a) { std::ofstream f(a[0].s, std::ios::binary); if (!f) throw dslvm::Error("Output.write_file: cannot write " + a[0].s); f << a[1].s; return dslvm::Value::none(); });
-  reg.method("Output", "fail", 1, [&](void* p, dslvm::Args& a) { std::cerr << "fail: " << a[0].s << "\n"; static_cast<Output*>(p)->failures++; return dslvm::Value::none(); });
-  reg.function("env", 1, [&](dslvm::Args& a) { const char* v = std::getenv(a[0].s.c_str()); if (!v) throw dslvm::Error("env: " + a[0].s + " is not set in the host environment (test with has_env)"); return dslvm::Value::string(v); });
-  reg.function("has_env", 1, [&](dslvm::Args& a) { return dslvm::Value::boolean(std::getenv(a[0].s.c_str()) != nullptr); });
-  reg.function("json_escape", 1, [&](dslvm::Args& a) { return dslvm::Value::string(json_escape(a[0].s)); });
+  register_schema(reg, arena, output);
 
-  // (2) Load and verify the DSL; nothing has happened yet.
+  // (2) Load and verify the DSL; nothing has happened yet. A refusal is one JSON line, phase load, exit 3 (spec v4 S0, A03).
   dslvm::Program program;
   try { program = dslvm::Program::load(dslvm::read_file(dslPath), dslvm::read_file(schemaPath), reg); }
-  catch (const dslvm::Error& e) { std::cerr << "error: " << dslPath << ": " << e.what() << "\n"; return 1; }
+  catch (const dslvm::Error& e) { std::cerr << "error: " << dslPath << ": " << e.what() << "\n"; return dslvm::report_error("load", e); }
   std::cerr << "loaded " << dslPath << " (" << program.constant_count() << " constants, " << program.code_size() << " code bytes)\n";
 
-  // The chunk is the callback: it configures and triggers requests through the host's objects.
+  // The chunk is the callback: it configures and triggers requests through the host's objects. A host or VM failure
+  // during the run is one JSON line, phase run, exit 3; the diagnostic also goes to stderr for the human reader.
   dslvm::Context ctx; ctx.set("out", &output);
   try { program.run(ctx, reg); }
-  catch (const dslvm::Error& e) { std::cout.flush(); std::cerr << "dsl runtime error: " << e.what() << "\n"; return 3; }
+  catch (const dslvm::Error& e) { std::cerr << "dsl runtime error: " << e.what() << "\n"; return dslvm::report_error("run", e); }
 
-  // (3) The host continues: summary and exit code.
-  std::cout.flush();
-  std::cerr << "done: " << arena.requests.size() << " request(s), " << arena.mirrors.size() << " mirror(s), " << output.failures << " failure(s)\n";
-  return output.failures ? 4 : 0;
+  // (3) The host continues: the summary on stderr, then exactly one JSON result line on stdout. `out.fail` messages make
+  // the run an application failure (exit 4, code APP_FAIL); otherwise the result carries every `out.print` line in order.
+  std::cerr << "done: " << arena.requests.size() << " request(s), " << arena.mirrors.size() << " mirror(s), " << output.failures.size() << " failure(s)\n";
+  if (!output.failures.empty()) {
+    std::string all; for (const auto& f : output.failures) all += (all.empty() ? "" : "; ") + f;
+    return dslvm::report_app_failure(all);
+  }
+  std::string lines; for (const auto& l : output.lines) lines += (lines.empty() ? "" : ", ") + dslvm::json_escape(l);
+  return dslvm::report_ok("{\"output\": [" + lines + "], \"requests\": " + std::to_string(arena.requests.size()) + ", \"mirrors\": " + std::to_string(arena.mirrors.size()) + "}");
 }

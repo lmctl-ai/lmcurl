@@ -2,14 +2,21 @@
 // Single source of truth: github.com/lmctlhq/cpp-dsl-sdk/include/dslvm.hpp (hosts vendor it by pinned sha256, see README).
 //
 // Public API (everything else in this header is an implementation detail):
-//   dslvm::Error                         exception type for load, verify and run-time failures (what() names the problem)
+//   dslvm::Error                         exception for load, verify and run-time failures: what() names the problem; code is one of
+//                                        LOAD_BAD_BYTECODE, LOAD_SCHEMA_MISMATCH, LOAD_UNBOUND, RUN_ERROR (VM), RUN_HOST (thrown by a host
+//                                        closure), APP_FAIL (the host's own application failure, see report_app_failure)
 //   dslvm::Value                         tagged value: VOID, INT (int32), FLOAT (binary64), STR (UTF-8), BOOL, OBJ (host pointer + schema type name)
 //   dslvm::Args                          std::vector<Value> of call arguments, in order
-//   dslvm::Registry                      what the host offers, by schema name: function(name, argc, fn), method(type, name, argc, fn),
-//                                        context(name, type) declares a context variable's type
+//   dslvm::Registry                      the implementation of the schema, declared with its types: function(name, {param types}, return
+//                                        type, fn), method(type, name, {param types}, return type, fn), context(name, type); duplicates are
+//                                        refused; signatures() lists the canonical strings `lmscript --dsl-signatures SCHEMA` prints, so a
+//                                        host test diffs registry and schema (spec v4 S0, a consistency check between two sources of truth,
+//                                        not a run-time defense: R33/R34, the VM checks nothing at call time)
 //   dslvm::Context                       the live objects of one run: set(name, pointer)
 //   dslvm::Program::load(bytes, schema, registry)  parses, binds and verifies; throws before anything runs
 //   dslvm::Program::run(context, registry)         executes the chunk once; throws dslvm::Error on a run-time failure
+//   dslvm::report_ok / report_error / report_app_failure   the standard one-line JSON result on stdout (spec v4 D7, R26) and the
+//                                        exit-code convention 2 compile (lmscript) / 3 host (load or run) / 4 application
 //   dslvm::VERSION                       the bytecode format version this SDK reads (and nothing else: no backward compatibility)
 //   dslvm::sha256 / hex / read_file      helpers the hosts use for the schema binding and files
 //
@@ -27,8 +34,10 @@
 #include <cstdint>
 #include <cmath>
 #include <cstdio>
+#include <cstdio>
 #include <cstring>
 #include <fstream>
+#include <iostream>
 #include <functional>
 #include <map>
 #include <memory>
@@ -39,7 +48,11 @@
 
 namespace dslvm {
 
-struct Error : std::runtime_error { explicit Error(const std::string& m) : std::runtime_error(m) {} };
+struct Error : std::runtime_error {
+  std::string code;
+  explicit Error(const std::string& m) : std::runtime_error(m), code("RUN_HOST") {}   // a plain message is what host closures throw
+  Error(const std::string& c, const std::string& m) : std::runtime_error(m), code(c) {}
+};
 
 // ---- SHA-256 (FIPS 180-4), used only to bind the bytecode to the exact schema bytes ----
 inline std::string sha256(const std::string& data) {
@@ -104,20 +117,59 @@ using Args = std::vector<Value>;
 using Function = std::function<Value(Args&)>;
 using Method = std::function<Value(void* self, Args&)>;
 
-// ---- Host registry: what the host offers, by schema name ----
+// ---- Host registry: the implementation of the schema, declared with the schema's types ----
+struct Signature { std::vector<std::string> params; std::string returns; };
+struct FunctionEntry { Signature sig; Function fn; };
+struct MethodEntry { Signature sig; Method fn; };
+inline std::string signature_text(const Signature& s) { std::string out = "("; for (size_t i = 0; i < s.params.size(); ++i) out += (i ? ", " : "") + s.params[i]; return out + ") -> " + s.returns; }
+
 class Registry {
  public:
-  void function(const std::string& name, size_t argc, Function fn) { functions_[name] = {argc, std::move(fn)}; }
-  void method(const std::string& type, const std::string& name, size_t argc, Method fn) { methods_[type + "." + name] = {argc, std::move(fn)}; }
-  void context(const std::string& name, const std::string& type) { context_[name] = type; }
-  const std::pair<size_t, Function>* find_function(const std::string& name) const { auto it = functions_.find(name); return it == functions_.end() ? nullptr : &it->second; }
-  const std::pair<size_t, Method>* find_method(const std::string& type, const std::string& name) const { auto it = methods_.find(type + "." + name); return it == methods_.end() ? nullptr : &it->second; }
+  // Type names are the schema's: int, float, string, bool, void (returns only) or an object type name. The arity the loader
+  // checks is params.size(). Registering a name twice is an error (two implementations of one schema entry).
+  Registry& function(const std::string& name, std::vector<std::string> params, std::string returns, Function fn) {
+    if (!functions_.emplace(name, FunctionEntry{{std::move(params), std::move(returns)}, std::move(fn)}).second) throw Error("LOAD_UNBOUND", "registry: function '" + name + "' is registered twice");
+    return *this;
+  }
+  Registry& method(const std::string& type, const std::string& name, std::vector<std::string> params, std::string returns, Method fn) {
+    if (!methods_.emplace(type + "." + name, MethodEntry{{std::move(params), std::move(returns)}, std::move(fn)}).second) throw Error("LOAD_UNBOUND", "registry: method '" + type + "." + name + "' is registered twice");
+    return *this;
+  }
+  Registry& context(const std::string& name, const std::string& type) {
+    if (!context_.emplace(name, type).second) throw Error("LOAD_UNBOUND", "registry: context '" + name + "' is declared twice");
+    return *this;
+  }
+  // Canonical strings, sorted: exactly what `lmscript --dsl-signatures SCHEMA` prints for the schema this registry implements.
+  std::vector<std::string> signatures() const {
+    std::vector<std::string> out;
+    for (auto& c : context_) out.push_back("context " + c.first + ": " + c.second);
+    for (auto& f : functions_) out.push_back("fn " + f.first + signature_text(f.second.sig));
+    for (auto& m : methods_) out.push_back("method " + m.first + signature_text(m.second.sig));
+    std::sort(out.begin(), out.end()); return out;
+  }
+  const FunctionEntry* find_function(const std::string& name) const { auto it = functions_.find(name); return it == functions_.end() ? nullptr : &it->second; }
+  const MethodEntry* find_method(const std::string& type, const std::string& name) const { auto it = methods_.find(type + "." + name); return it == methods_.end() ? nullptr : &it->second; }
   const std::string* context_type(const std::string& name) const { auto it = context_.find(name); return it == context_.end() ? nullptr : &it->second; }
  private:
-  std::map<std::string, std::pair<size_t, Function>> functions_;
-  std::map<std::string, std::pair<size_t, Method>> methods_;
+  std::map<std::string, FunctionEntry> functions_;
+  std::map<std::string, MethodEntry> methods_;
   std::map<std::string, std::string> context_;
 };
+
+inline std::string json_escape(const std::string& s) {
+  std::string out = "\"";
+  for (unsigned char c : s) { switch (c) { case '"': out += "\\\""; break; case '\\': out += "\\\\"; break; case '\n': out += "\\n"; break; case '\r': out += "\\r"; break; case '\t': out += "\\t"; break; default: if (c < 0x20) { char b[8]; std::snprintf(b, sizeof b, "\\u%04x", c); out += b; } else out += char(c); } }
+  return out + "\"";
+}
+// ---- The standard result line (spec v4 D7, R26): exactly one JSON line on stdout; the return value is the process exit code. ----
+// `result_json` must already be JSON text ("null", "42", json_escape(text), an object...).
+inline int report_ok(const std::string& result_json = "null") { std::cout << "{\"ok\": true, \"result\": " << result_json << "}" << std::endl; return 0; }
+// phase is "load" or "run" (compile failures are lmscript's, exit 2); exit 4 for APP_FAIL, else 3.
+inline int report_error(const std::string& phase, const Error& e) {
+  std::cout << "{\"ok\": false, \"phase\": " << json_escape(phase) << ", \"code\": " << json_escape(e.code) << ", \"message\": " << json_escape(e.what()) << "}" << std::endl;
+  return e.code == "APP_FAIL" ? 4 : 3;
+}
+inline int report_app_failure(const std::string& message) { return report_error("app", Error("APP_FAIL", message)); }
 
 // ---- Per-run context: the host's live objects, by declared name ----
 class Context {
@@ -147,7 +199,7 @@ static const size_t MAX_STRING_BYTES = 16u * 1024u * 1024u; // result size of on
 class Reader {
  public:
   explicit Reader(const std::string& bytes) : b_(&bytes) {}
-  void seek(size_t pos) { if (pos > b_->size()) throw Error("jump target " + std::to_string(pos) + " is outside the code"); pos_ = pos; }
+  void seek(size_t pos) { if (pos > b_->size()) throw Error("RUN_ERROR", "jump target " + std::to_string(pos) + " is outside the code"); pos_ = pos; }
   uint8_t u8() { need(1); return static_cast<uint8_t>((*b_)[pos_++]); }
   uint16_t u16() { need(2); uint16_t v = (uint16_t(uint8_t((*b_)[pos_])) << 8) | uint8_t((*b_)[pos_+1]); pos_ += 2; return v; }
   uint32_t u32() { need(4); uint32_t v = 0; for (int i = 0; i < 4; ++i) v = (v << 8) | uint8_t((*b_)[pos_+i]); pos_ += 4; return v; }
@@ -157,7 +209,7 @@ class Reader {
   size_t pos() const { return pos_; }
   bool done() const { return pos_ == b_->size(); }
  private:
-  void need(size_t n) { if (pos_ + n > b_->size()) throw Error("bytecode is truncated: wanted " + std::to_string(n) + " byte(s) at offset " + std::to_string(pos_) + ", file has " + std::to_string(b_->size())); }
+  void need(size_t n) { if (pos_ + n > b_->size()) throw Error("LOAD_BAD_BYTECODE", "bytecode is truncated: wanted " + std::to_string(n) + " byte(s) at offset " + std::to_string(pos_) + ", file has " + std::to_string(b_->size())); }
   const std::string* b_; size_t pos_ = 0;
 };
 
@@ -167,18 +219,18 @@ class Program {
   static Program load(const std::string& bytecode, const std::string& schemaBytes, const Registry& reg) {
     Program p;
     Reader r(bytecode);
-    if (bytecode.size() < 4 || std::memcmp(bytecode.data(), MAGIC, 4) != 0) throw Error("not a DSL bytecode file: bad magic (expected 'DSLB')");
+    if (bytecode.size() < 4 || std::memcmp(bytecode.data(), MAGIC, 4) != 0) throw Error("LOAD_BAD_BYTECODE", "not a DSL bytecode file: bad magic (expected 'DSLB')");
     r.bytes(4);
     uint16_t version = r.u16();
-    if (version != VERSION) throw Error("unsupported bytecode version " + std::to_string(version) + " (this runtime reads version " + std::to_string(VERSION) + ")");
+    if (version != VERSION) throw Error("LOAD_BAD_BYTECODE", "unsupported bytecode version " + std::to_string(version) + " (this runtime reads version " + std::to_string(VERSION) + ")");
     std::string hash = r.bytes(32), expected = sha256(schemaBytes);
-    if (hash != expected) throw Error("schema mismatch: bytecode was compiled against schema sha256 " + hex(hash) + ", the given schema has sha256 " + hex(expected));
+    if (hash != expected) throw Error("LOAD_SCHEMA_MISMATCH", "schema mismatch: bytecode was compiled against schema sha256 " + hex(hash) + ", the given schema has sha256 " + hex(expected));
     uint16_t nconst = r.u16();
     for (uint16_t i = 0; i < nconst; ++i) { uint16_t len = r.u16(); p.consts_.push_back(r.bytes(len)); }
     p.nlocals_ = r.u16();
     uint32_t codeLen = r.u32();
     p.code_ = r.bytes(codeLen);
-    if (!r.done()) throw Error("bytecode has " + std::to_string(bytecode.size() - r.pos()) + " trailing byte(s) after the code section");
+    if (!r.done()) throw Error("LOAD_BAD_BYTECODE", "bytecode has " + std::to_string(bytecode.size() - r.pos()) + " trailing byte(s) after the code section");
     p.verify(reg);
     return p;
   }
@@ -187,9 +239,9 @@ class Program {
   void run(const Context& ctx, const Registry& reg) const {
     std::vector<Value> stack, locals(nlocals_);
     Reader r(code_);
-    auto pop = [&]() { if (stack.empty()) throw Error("stack underflow"); Value v = std::move(stack.back()); stack.pop_back(); return v; };
-    auto push = [&](Value v) { if (stack.size() >= MAX_STACK) throw Error("operand stack exceeds " + std::to_string(MAX_STACK) + " values"); stack.push_back(std::move(v)); };
-    auto jump = [&](int32_t rel) { int64_t target = int64_t(r.pos()) + rel; if (target < 0) throw Error("jump before the code start"); r.seek(size_t(target)); };
+    auto pop = [&]() { if (stack.empty()) throw Error("RUN_ERROR", "stack underflow"); Value v = std::move(stack.back()); stack.pop_back(); return v; };
+    auto push = [&](Value v) { if (stack.size() >= MAX_STACK) throw Error("RUN_ERROR", "operand stack exceeds " + std::to_string(MAX_STACK) + " values"); stack.push_back(std::move(v)); };
+    auto jump = [&](int32_t rel) { int64_t target = int64_t(r.pos()) + rel; if (target < 0) throw Error("RUN_ERROR", "jump before the code start"); r.seek(size_t(target)); };
     while (true) {
       uint8_t op = r.u8();
       switch (op) {
@@ -199,20 +251,20 @@ class Program {
         case PUSH_BOOL: push(Value::boolean(r.u8() != 0)); break;
         case LOAD_LOCAL: {
           uint16_t s = r.u16();
-          if (locals[s].kind == Value::VOID) throw Error("local slot " + std::to_string(s) + " read before assignment");
+          if (locals[s].kind == Value::VOID) throw Error("RUN_ERROR", "local slot " + std::to_string(s) + " read before assignment");
           push(locals[s]); break;
         }
         case STORE_LOCAL: { uint16_t s = r.u16(); locals[s] = pop(); break; }
         case LOAD_CTX: {
           const std::string& name = consts_[r.u16()];
           void* obj = ctx.get(name);
-          if (!obj) throw Error("context variable '" + name + "' was not provided by the host for this run");
+          if (!obj) throw Error("RUN_ERROR", "context variable '" + name + "' was not provided by the host for this run");
           push(Value::object(*reg.context_type(name), obj)); break;
         }
         case CALL_FN: {
           const std::string& name = consts_[r.u16()]; uint8_t argc = r.u8();
           Args args(argc); for (int i = argc - 1; i >= 0; --i) args[i] = pop();
-          Value result = reg.find_function(name)->second(args);
+          Value result = reg.find_function(name)->fn(args);
           if (result.kind != Value::VOID) push(std::move(result));
           break;
         }
@@ -220,8 +272,8 @@ class Program {
           const std::string& type = consts_[r.u16()]; const std::string& name = consts_[r.u16()]; uint8_t argc = r.u8();
           Args args(argc); for (int i = argc - 1; i >= 0; --i) args[i] = pop();
           Value self = pop();
-          if (self.kind != Value::OBJ || self.type != type) throw Error("method " + type + "." + name + " called on a " + (self.kind == Value::OBJ ? self.type : std::string(self.kind_name())));
-          Value result = reg.find_method(type, name)->second(self.obj, args);
+          if (self.kind != Value::OBJ || self.type != type) throw Error("RUN_ERROR", "method " + type + "." + name + " called on a " + (self.kind == Value::OBJ ? self.type : std::string(self.kind_name())));
+          Value result = reg.find_method(type, name)->fn(self.obj, args);
           if (result.kind != Value::VOID) push(std::move(result));
           break;
         }
@@ -237,11 +289,11 @@ class Program {
           int64_t x = a.i, y = b.i, r64 = 0;
           switch (op) {
             case ADD_I: r64 = x + y; break; case SUB_I: r64 = x - y; break; case MUL_I: r64 = x * y; break;
-            case DIV_I: if (y == 0) throw Error("int division by zero"); r64 = x / y; break;  // truncates toward zero
+            case DIV_I: if (y == 0) throw Error("RUN_ERROR", "int division by zero"); r64 = x / y; break;  // truncates toward zero
             case LT_I: push(Value::boolean(x < y)); continue; case LE_I: push(Value::boolean(x <= y)); continue;
             case GT_I: push(Value::boolean(x > y)); continue; default: push(Value::boolean(x >= y)); continue;
           }
-          if (r64 > INT32_MAX || r64 < INT32_MIN) throw Error("int overflow: " + std::to_string(r64) + " does not fit a 32-bit int");
+          if (r64 > INT32_MAX || r64 < INT32_MIN) throw Error("RUN_ERROR", "int overflow: " + std::to_string(r64) + " does not fit a 32-bit int");
           push(Value::integer(int32_t(r64))); break;
         }
         case ADD_F: case SUB_F: case MUL_F: case DIV_F: case LT_F: case LE_F: case GT_F: case GE_F: {
@@ -255,13 +307,13 @@ class Program {
           }
           break;
         }
-        case NEG_I: { Value a = pop(); if (a.kind != Value::INT) throw Error(std::string("int negation applied to ") + a.kind_name()); if (a.i == INT32_MIN) throw Error("int overflow: negating the smallest int"); push(Value::integer(-a.i)); break; }
+        case NEG_I: { Value a = pop(); if (a.kind != Value::INT) throw Error(std::string("int negation applied to ") + a.kind_name()); if (a.i == INT32_MIN) throw Error("RUN_ERROR", "int overflow: negating the smallest int"); push(Value::integer(-a.i)); break; }
         case NEG_F: { Value a = pop(); if (a.kind != Value::FLOAT) throw Error(std::string("float negation applied to ") + a.kind_name()); push(Value::real(-a.f)); break; }
         case I2F: { Value a = pop(); if (a.kind != Value::INT) throw Error(std::string("float() applied to ") + a.kind_name()); push(Value::real(double(a.i))); break; }
         case CONCAT: {
           Value b = pop(), a = pop();
           if (a.kind != Value::STR || b.kind != Value::STR) throw Error(std::string("string + applied to ") + a.kind_name() + " and " + b.kind_name());
-          if (a.s.size() + b.s.size() > MAX_STRING_BYTES) throw Error("string + result exceeds " + std::to_string(MAX_STRING_BYTES) + " bytes");
+          if (a.s.size() + b.s.size() > MAX_STRING_BYTES) throw Error("RUN_ERROR", "string + result exceeds " + std::to_string(MAX_STRING_BYTES) + " bytes");
           push(Value::string(a.s + b.s)); break;
         }
         case I2S: { Value a = pop(); if (a.kind != Value::INT) throw Error(std::string("str(int) applied to ") + a.kind_name()); push(Value::string(std::to_string(a.i))); break; }
@@ -283,12 +335,12 @@ class Program {
           break;
         }
         case DUP: {
-          if (stack.empty()) throw Error("stack underflow");
+          if (stack.empty()) throw Error("RUN_ERROR", "stack underflow");
           push(stack.back()); break;
         }
         case POP: pop(); break;
         case HALT: return;
-        default: throw Error("unknown opcode " + std::to_string(op));
+        default: throw Error("RUN_ERROR", "unknown opcode " + std::to_string(op));
       }
     }
   }
@@ -302,7 +354,7 @@ class Program {
   void verify(const Registry& reg) const {
     std::vector<size_t> starts; std::vector<std::pair<size_t, int64_t>> jumps;
     Reader r(code_);
-    auto cidx = [&](uint16_t i) -> const std::string& { if (i >= consts_.size()) throw Error("constant index " + std::to_string(i) + " out of range (" + std::to_string(consts_.size()) + " constants)"); return consts_[i]; };
+    auto cidx = [&](uint16_t i) -> const std::string& { if (i >= consts_.size()) throw Error("LOAD_BAD_BYTECODE", "constant index " + std::to_string(i) + " out of range (" + std::to_string(consts_.size()) + " constants)"); return consts_[i]; };
     bool halted = false;
     while (!r.done()) {
       starts.push_back(r.pos());
@@ -313,29 +365,29 @@ class Program {
         case PUSH_STR: cidx(r.u16()); break;
         case PUSH_BOOL: {
           uint8_t v = r.u8();
-          if (v > 1) throw Error("PUSH_BOOL operand must be 0 or 1");
+          if (v > 1) throw Error("LOAD_BAD_BYTECODE", "PUSH_BOOL operand must be 0 or 1");
           break;
         }
         case LOAD_LOCAL: case STORE_LOCAL: {
           uint16_t s = r.u16();
-          if (s >= nlocals_) throw Error("local slot " + std::to_string(s) + " out of range (" + std::to_string(nlocals_) + " locals)");
+          if (s >= nlocals_) throw Error("RUN_ERROR", "local slot " + std::to_string(s) + " out of range (" + std::to_string(nlocals_) + " locals)");
           break;
         }
         case LOAD_CTX: {
           const std::string& n = cidx(r.u16());
-          if (!reg.context_type(n)) throw Error("context variable '" + n + "' is not declared by the host");
+          if (!reg.context_type(n)) throw Error("LOAD_UNBOUND", "context variable '" + n + "' is not declared by the host");
           break;
         }
         case CALL_FN: {
           const std::string& n = cidx(r.u16()); uint8_t argc = r.u8(); auto f = reg.find_function(n);
-          if (!f) throw Error("host function '" + n + "' is not bound");
-          if (f->first != argc) throw Error("host function '" + n + "' takes " + std::to_string(f->first) + " argument(s), bytecode passes " + std::to_string(argc));
+          if (!f) throw Error("LOAD_UNBOUND", "host function '" + n + "' is not bound");
+          if (f->sig.params.size() != argc) throw Error("LOAD_UNBOUND", "host function '" + n + "' takes " + std::to_string(f->sig.params.size()) + " argument(s), bytecode passes " + std::to_string(argc));
           break;
         }
         case CALL_METHOD: {
           const std::string& t = cidx(r.u16()); const std::string& n = cidx(r.u16()); uint8_t argc = r.u8(); auto m = reg.find_method(t, n);
-          if (!m) throw Error("method '" + t + "." + n + "' is not bound");
-          if (m->first != argc) throw Error("method '" + t + "." + n + "' takes " + std::to_string(m->first) + " argument(s), bytecode passes " + std::to_string(argc));
+          if (!m) throw Error("LOAD_UNBOUND", "method '" + t + "." + n + "' is not bound");
+          if (m->sig.params.size() != argc) throw Error("LOAD_UNBOUND", "method '" + t + "." + n + "' takes " + std::to_string(m->sig.params.size()) + " argument(s), bytecode passes " + std::to_string(argc));
           break;
         }
         case EQ: case NE: case NOT: case DUP: case POP: break;
@@ -343,18 +395,18 @@ class Program {
         case LT_I: case LE_I: case GT_I: case GE_I: case LT_F: case LE_F: case GT_F: case GE_F: case I2F: case CONCAT: case I2S: case F2S: case B2S: break;
         case JUMP: case JUMP_IF_FALSE: case JUMP_IF_TRUE: {
           int32_t rel = r.i32();
-          if (rel < 0) throw Error("jump at offset " + std::to_string(starts.back()) + " goes backwards (the language has no loops; every jump must move forward)");
+          if (rel < 0) throw Error("LOAD_BAD_BYTECODE", "jump at offset " + std::to_string(starts.back()) + " goes backwards (the language has no loops; every jump must move forward)");
           jumps.emplace_back(r.pos(), int64_t(r.pos()) + rel); break;
         }
         case HALT: halted = true; break;
-        default: throw Error("unknown opcode " + std::to_string(op) + " at offset " + std::to_string(starts.back()));
+        default: throw Error("RUN_ERROR", "unknown opcode " + std::to_string(op) + " at offset " + std::to_string(starts.back()));
       }
     }
-    if (!halted) throw Error("code does not end with HALT");
-    if (nlocals_ > 4096) throw Error("too many locals: " + std::to_string(nlocals_) + " (limit 4096)");
+    if (!halted) throw Error("LOAD_BAD_BYTECODE", "code does not end with HALT");
+    if (nlocals_ > 4096) throw Error("LOAD_BAD_BYTECODE", "too many locals: " + std::to_string(nlocals_) + " (limit 4096)");
     for (auto& j : jumps) {
       bool ok = j.second >= 0 && std::find(starts.begin(), starts.end(), size_t(j.second)) != starts.end();
-      if (!ok) throw Error("jump at offset " + std::to_string(j.first) + " targets " + std::to_string(j.second) + ", not an instruction start");
+      if (!ok) throw Error("LOAD_BAD_BYTECODE", "jump at offset " + std::to_string(j.first) + " targets " + std::to_string(j.second) + ", not an instruction start");
     }
   }
   std::vector<std::string> consts_; uint16_t nlocals_ = 0; std::string code_;
@@ -362,7 +414,7 @@ class Program {
 
 inline std::string read_file(const std::string& path) {
   std::ifstream in(path, std::ios::binary);
-  if (!in) throw Error("cannot read " + path);
+  if (!in) throw Error("LOAD_BAD_BYTECODE", "cannot read " + path);
   std::ostringstream s; s << in.rdbuf(); return s.str();
 }
 

@@ -19,7 +19,12 @@ design. Run on 2026-10-18 with g++ 11, Node 26, OpenSSL 3 and lmscript 0.2.328 /
   allowed content types, output directory and limits on a host-provided `Mirror` object and runs it; the host does the
   breadth-first crawl, link extraction, URL resolution and safe local paths. Exact file set asserted by the test.
 - **R12 again.** The host starts, builds its registry, loads and verifies the bytecode, runs the chunk once with `out` as
-  context, then flushes and exits 0 (ok), 1 (load refused), 3 (DSL run-time error from the host) or 4 (`out.fail`).
+  context, then prints exactly one JSON result line on stdout (spec v4 S0, A03) and exits 0 (ok: `{"ok": true, "result":
+  {"output": [every out.print line], "requests": n, "mirrors": n}}`), 3 (host: `phase load` refusal or `phase run` failure with a
+  code such as LOAD_SCHEMA_MISMATCH or RUN_HOST) or 4 (`out.fail`: `phase app`, code APP_FAIL, the failure messages). Human
+  diagnostics (`loaded`, `fail:`, `done`) stay on stderr. `build/curlhost --dsl-signatures` lists the registry's 36 canonical
+  signatures; `test.sh` diffs them against `lmscript --dsl-signatures schema/curl.dsl.json` (A02) when the lmscript on PATH has
+  the flag (released 0.2.328 does not yet: a `skip -` note; `LMSCRIPT_MIN=0 LMSCRIPT_BIN=.../lmctl-mono/lmscript/bin/lmscript` uses a mono build).
 - **R20, one run instead of many launches.** See "Processes" below.
 
 ## Run it
@@ -33,27 +38,24 @@ design. Run on 2026-10-18 with g++ 11, Node 26, OpenSSL 3 and lmscript 0.2.328 /
     $LMSCRIPT_BIN examples/mirror.lms build/mirror.dslb http://127.0.0.1:8080/site/index.html build/mirror 2
     build/curlhost --dsl build/mirror.dslb --schema schema/curl.dsl.json
 
-Transcript (`bash test.sh`, 23 checks against the mock):
+Transcript (`bash test.sh`, 25 checks against the mock with a mono lmscript, 24 with the released one):
 
-    ok 3 - post.lms: POST /echo with JSON body and two headers, status 200, exact body echoed
-        status 200 ok=true
-        content-type: application/json
-        {"method":"POST","path":"/echo","headers":{...,"content-type":"application/json","x-trace":"post-example","content-length":"78"},"body":"{\"name\":\"poc-curl\",...}"}
-    ok 4 - llm.lms (mock): Authorization from the host env, reply and usage extracted with json_text paths
-        model: mock-mini
-        reply: Echo: Say hello in five words.
-        tokens: 54
-    ok 5 - llm.lms without the key: no request is sent, out.fail -> exit 4
-    ok 6 - llm.lms with a wrong key: the API error message is reported (401), exit 4
+    ok 3 - registry signatures equal the schema's (36 entries, lmscript --dsl-signatures)
+        {"ok": true, "result": {"output": ["status 200 ok=true", "content-type: application/json", "{\"method\":\"POST\",\"path\":\"/echo\",...}"], "requests": 1, "mirrors": 0}}
+    ok 4 - post.lms: POST /echo with JSON body and two headers, status 200, exact body echoed
+        {"ok": true, "result": {"output": ["model: mock-mini", "reply: Echo: Say hello in five words.", "tokens: 54"], "requests": 1, "mirrors": 0}}
+    ok 5 - llm.lms (mock): Authorization from the host env, reply and usage extracted with json_text paths
+    ok 6 - llm.lms without the key: no request is sent, out.fail -> one JSON line, phase app, APP_FAIL, exit 4
+    ok 7 - llm.lms with a wrong key: the API error message is the APP_FAIL result line (401), exit 4
     skip - live LLM call (set POC_CURL_LIVE=1 and OPENAI_API_KEY to run it; it costs money)
-    ok 7 - mirror.lms: exactly 8 files under host_port/; d3 beyond depth 2 not fetched; dir/ -> index.html; css kept, png skipped
-        pages 9 skipped 2 failed 1 bytes 887
-    ok 11 - client: chunked body reassembled, 302 followed (and not followed with max_redirects(0)), 404 reported
-    ok 12 - client: size limit refuses a 1 MB body before reading it (exit 3)
-    ok 13 - client: timeout_ms(300) aborts a 3 s response (exit 3)
-    ok 14 ... ok 20 - seven ill-typed chunks rejected at lmscript check time with located errors
-    ok 21 ... ok 23 - host refuses a schema-hash mismatch, a truncated file and bytecode version 2
-    PASS 23 checks
+        {"ok": true, "result": {"output": ["pages 9 skipped 2 failed 1 bytes 887"], "requests": 0, "mirrors": 1}}
+    ok 8 - mirror.lms: exactly 8 files under host_port/; d3 beyond depth 2 not fetched; dir/ -> index.html; css kept, png skipped
+    ok 12 - client: chunked body reassembled, 302 followed (and not followed with max_redirects(0)), 404 reported
+    ok 13 - client: size limit refuses a 1 MB body before reading it (phase run, RUN_HOST, exit 3)
+    ok 14 - client: timeout_ms(300) aborts a 3 s response (exit 3)
+    ok 15 ... ok 21 - seven ill-typed chunks rejected at lmscript check time with located errors
+    ok 22 ... ok 25 - host refuses a schema-hash mismatch (LOAD_SCHEMA_MISMATCH), a truncated file and bytecode version 2 (LOAD_BAD_BYTECODE), each one JSON line with exit 3
+    PASS 25 checks
 
 The mirror chunk, the one that replaces a loop with configuration:
 
@@ -80,7 +82,7 @@ chunk).
 | --- | --- |
 | `schema/curl.dsl.json` | the contract: `Request` builder (method, url, header, body, timeout_ms, max_bytes, max_redirects, send), `Response` (status, ok, body, header, has_json, json_text), `Mirror` (start, depth, same_host, allow, out_dir, max_pages, max_bytes, delay_ms, run), `MirrorResult`, `Output` (print, write_file, fail); functions `request`, `mirror`, `env`, `has_env`, `json_escape`; context `out` |
 | `cpp/http.hpp` | HTTP/1.1 client over POSIX sockets: Connection: close, Content-Length and chunked bodies, bounded redirects, timeouts, size limits, URL parsing and RFC 3986-lite resolution, TLS through OpenSSL under `HAVE_OPENSSL` |
-| `cpp/curlhost.cpp` | the host: registry, a small JSON parser with dotted-path lookup, the crawler (same-host, content types, safe local paths, loop and depth control), load, run, exit codes |
+| `cpp/curlhost.cpp` | the host: typed registry (`register_schema`, `--dsl-signatures`), a small JSON parser with dotted-path lookup, the crawler (same-host, content types, safe local paths, loop and depth control), load, run, the JSON result line and exit codes |
 | `cpp/dslvm.hpp` | the shared runtime, vendored from [lmctlhq/cpp-dsl-sdk](https://github.com/lmctlhq/cpp-dsl-sdk) and pinned by `sdk.lock` (commit + sha256; `scripts/sync-sdk.sh` refreshes it from a sibling checkout, `test.sh` fails on drift); bytecode v3 |
 | `tools/mock-server.mjs` | node mock: `/echo`, `/v1/chat/completions`, `/go` (302), `/chunked`, `/big`, `/slow`, a static site with a loop, an off-site link, a 404 link, a depth chain, CSS and a PNG |
 | `examples/post.lms`, `examples/llm.lms`, `examples/mirror.lms` | the three scripts |
