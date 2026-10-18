@@ -60,8 +60,14 @@ inline std::string resolve(const std::string& base, const std::string& ref) {
   path.erase(path.rfind('/') + 1);
   std::string merged = path + ref, query;
   q = merged.find('?'); if (q != std::string::npos) { query = merged.substr(q); merged.erase(q); }
-  std::vector<std::string> segments; size_t i = 0;
-  while (i <= merged.size()) { size_t j = merged.find('/', i); std::string seg = merged.substr(i, j == std::string::npos ? std::string::npos : j - i); if (seg == "..") { if (!segments.empty()) segments.pop_back(); } else if (seg != "." && !(seg.empty() && j != std::string::npos && i != 0)) segments.push_back(seg); if (j == std::string::npos) break; i = j + 1; }
+  std::vector<std::string> segments; size_t i = (!merged.empty() && merged[0] == '/') ? 1 : 0;
+  while (i <= merged.size()) {
+    size_t j = merged.find('/', i); std::string seg = merged.substr(i, j == std::string::npos ? std::string::npos : j - i);
+    if (seg == "..") { if (!segments.empty()) segments.pop_back(); }
+    else if (seg != "." && !seg.empty()) segments.push_back(seg);
+    if (j == std::string::npos) break;
+    i = j + 1;
+  }
   std::string out; for (size_t k = 0; k < segments.size(); ++k) out += "/" + segments[k];
   if (out.empty()) out = "/";
   bool dirLike = merged.back() == '/' || (merged.size() >= 3 && merged.compare(merged.size()-3, 3, "/..") == 0) || (merged.size() >= 2 && merged.compare(merged.size()-2, 2, "/.") == 0);
@@ -168,13 +174,13 @@ inline Response fetch_once(const std::string& url, const std::string& method, co
   return r;
 }
 
-// Follows 301/302/303/307/308 up to opt.maxRedirects; 303 and 301/302 on POST switch to GET without a body (browsers' rule).
+// Follows 301/302/303/307/308 up to opt.maxRedirects hops; when the limit is reached the last 3xx response is returned as-is
+// (max_redirects(0) behaves like curl without -L). 303 and 301/302 on POST switch to GET without a body (browsers' rule).
 inline Response fetch(std::string url, std::string method, const std::vector<std::pair<std::string, std::string>>& headers, std::string body, const Options& opt) {
   for (int hop = 0; ; ++hop) {
     Response r = fetch_once(url, method, headers, body, opt);
     bool redirect = r.status == 301 || r.status == 302 || r.status == 303 || r.status == 307 || r.status == 308;
-    if (!redirect || r.header("Location").empty()) return r;
-    if (hop >= opt.maxRedirects) throw Error("too many redirects (limit " + std::to_string(opt.maxRedirects) + "), last location " + r.header("Location"));
+    if (!redirect || r.header("Location").empty() || hop >= opt.maxRedirects) return r;
     url = resolve(url, r.header("Location"));
     if (r.status == 303 || ((r.status == 301 || r.status == 302) && method == "POST")) { method = "GET"; body.clear(); }
   }

@@ -1,0 +1,29 @@
+# Mirror a static website (EXPERIMENTAL _dsl_ proof of concept, R22). The DSL does not loop (R13): the host provides the
+# crawler and the chunk CONFIGURES it (start URL, depth, same host only, allowed content types, output directory, limits),
+# then reports the result. Files land under OUT_DIR/host[_port]/path (index.html for directories; no path traversal).
+# Run from the repo root: $LMSCRIPT_BIN examples/mirror.lms build/mirror.dslb [START_URL] [OUT_DIR] [DEPTH]
+#                         build/curlhost --dsl build/mirror.dslb --schema schema/curl.dsl.json
+out = ARGV.len() > 0 ? ARGV[0] : "build/mirror.dslb";
+start = ARGV.len() > 1 ? ARGV[1] : "http://127.0.0.1:8080/site/index.html";
+out_dir = ARGV.len() > 2 ? ARGV[2] : "build/mirror";
+depth = ARGV.len() > 3 ? num(ARGV[3]) : 2;
+program = _dsl_ schema="../schema/curl.dsl.json";
+let site = mirror()
+  .start(${start})
+  .depth(${depth})
+  .same_host(true)
+  .allow("text/html")
+  .allow("text/css")
+  .out_dir(${out_dir})
+  .max_pages(50)
+  .max_bytes(2000000)
+  .delay_ms(0);
+let result = site.run();
+out.print("pages " + str(result.pages()) + " skipped " + str(result.skipped()) + " failed " + str(result.failed()) + " bytes " + str(result.bytes()));
+if (result.pages() == 0) {
+  out.fail("nothing was mirrored from " + ${start});
+}
+end _dsl_
+mkdir(dirname(out));
+savedsl(program, out);
+println(f"wrote {out} (mirror {start} depth {depth} -> {out_dir})");
