@@ -2,11 +2,9 @@
 
 Status: EXPERIMENTAL proof of concept for the lmscript `_dsl_` framework (lmctl-mono `lmscript/durable-memory/requirements/dsl-bytecode.md`
 R12-R16, R20, R22; living language spec `lmscript/durable-memory/design/dsl-language.md`, bytecode v3). Nothing here is an accepted
-design. Run on 2026-10-18 with g++ 11, Node 26, OpenSSL 3 and a mono build of lmscript.
+design. Run on 2026-10-18 with g++ 11, Node 26, OpenSSL 3 and lmscript 0.2.328 / 0.2.330.
 
-**lmscript build needed.** `_dsl_` and `savedsl` are not in the npm staging build 0.2.311. Use a mono build:
-`LMSCRIPT_BIN=~/repos/lmctlhq/lmctl-mono/lmscript/bin/lmscript` (default in `test.sh`: `../lmctl-mono/lmscript/bin/lmscript`;
-build it with `npm run build` in `lmctl-mono/lmscript`).
+**lmscript.** `_dsl_` and `savedsl` are released (EXPERIMENTAL) in npm `@lmctl-ai/lmctl`: `latest` 0.2.328 and `staging` 0.2.330. `npm install -g @lmctl-ai/lmctl` is enough; `test.sh` uses `lmscript` from PATH (>= 0.2.328, checked) or `LMSCRIPT_BIN`.
 
 ## What it proves
 
