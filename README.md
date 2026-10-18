@@ -83,10 +83,11 @@ chunk).
 | `schema/curl.dsl.json` | the contract: `Request` builder (method, url, header, body, timeout_ms, max_bytes, max_redirects, send), `Response` (status, ok, body, header, has_json, json_text), `Mirror` (start, depth, same_host, allow, out_dir, max_pages, max_bytes, delay_ms, run), `MirrorResult`, `Output` (print, write_file, fail); functions `request`, `mirror`, `env`, `has_env`, `json_escape`; context `out` |
 | `cpp/http.hpp` | HTTP/1.1 client over POSIX sockets: Connection: close, Content-Length and chunked bodies, bounded redirects, timeouts, size limits, URL parsing and RFC 3986-lite resolution, TLS through OpenSSL under `HAVE_OPENSSL` |
 | `cpp/curlhost.cpp` | the host: registry, a small JSON parser with dotted-path lookup, the crawler (same-host, content types, safe local paths, loop and depth control), load, run, exit codes |
-| `cpp/dslvm.hpp` | the shared runtime, third verbatim copy (poc-web, poc-numpy, poc-curl); bytecode v3 |
+| `cpp/dslvm.hpp` | the shared runtime, vendored from [lmctlhq/cpp-dsl-sdk](https://github.com/lmctlhq/cpp-dsl-sdk) and pinned by `sdk.lock` (commit + sha256; `scripts/sync-sdk.sh` refreshes it from a sibling checkout, `test.sh` fails on drift); bytecode v3 |
 | `tools/mock-server.mjs` | node mock: `/echo`, `/v1/chat/completions`, `/go` (302), `/chunked`, `/big`, `/slow`, a static site with a loop, an off-site link, a 404 link, a depth chain, CSS and a PNG |
 | `examples/post.lms`, `examples/llm.lms`, `examples/mirror.lms` | the three scripts |
-| `test.sh` | end-to-end test (LMSCRIPT_BIN) |
+| `test.sh` | end-to-end test (LMSCRIPT_BIN); first check: the vendored header matches `sdk.lock` |
+| `sdk.lock`, `scripts/sync-sdk.sh` | pin and refresh of the cpp-dsl-sdk header |
 
 ## Decisions (confirm or change)
 

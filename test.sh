@@ -16,6 +16,10 @@ trap cleanup EXIT
 SCHEMA="$HERE/schema/curl.dsl.json"
 compile() { (cd "$HERE" && "$LMSCRIPT" "$@") ; }
 
+# 0. The vendored runtime must be the pinned cpp-dsl-sdk header.
+"$HERE/scripts/sync-sdk.sh" --verify >/dev/null || fail "cpp/dslvm.hpp differs from sdk.lock (run scripts/sync-sdk.sh)"
+ok "cpp/dslvm.hpp matches sdk.lock ($(sed -n 's/^commit=//p' "$HERE/sdk.lock" | cut -c1-12))"
+
 # 1. Build the host; start the mock.
 make -C "$HERE" BUILD="$WORK/build" >"$WORK/make.log" 2>&1 || { cat "$WORK/make.log"; fail "C++ build"; }
 HOST="$WORK/build/curlhost"

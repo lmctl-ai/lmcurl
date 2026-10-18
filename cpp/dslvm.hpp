@@ -1,7 +1,27 @@
-// dslvm: embryo of cpp-dsl-sdk. Header-only, C++17, standard library only.
-// Loads a DSL bytecode file (format v3, big-endian, fixed widths, IEEE-754 binary64 floats), verifies it against the host's
-// registry and the schema bytes, and runs the one chunk against a host-provided context. Spec: lmctl-mono
-// lmscript/durable-memory/design/dsl-language.md. This header is copied verbatim into every POC host repo (poc-web, poc-numpy, poc-curl).
+// cpp-dsl-sdk: the C++ runtime for lmscript `_dsl_` bytecode. Header-only, C++17, standard library only.
+// Single source of truth: github.com/lmctlhq/cpp-dsl-sdk/include/dslvm.hpp (hosts vendor it by pinned sha256, see README).
+//
+// Public API (everything else in this header is an implementation detail):
+//   dslvm::Error                         exception type for load, verify and run-time failures (what() names the problem)
+//   dslvm::Value                         tagged value: VOID, INT (int32), FLOAT (binary64), STR (UTF-8), BOOL, OBJ (host pointer + schema type name)
+//   dslvm::Args                          std::vector<Value> of call arguments, in order
+//   dslvm::Registry                      what the host offers, by schema name: function(name, argc, fn), method(type, name, argc, fn),
+//                                        context(name, type) declares a context variable's type
+//   dslvm::Context                       the live objects of one run: set(name, pointer)
+//   dslvm::Program::load(bytes, schema, registry)  parses, binds and verifies; throws before anything runs
+//   dslvm::Program::run(context, registry)         executes the chunk once; throws dslvm::Error on a run-time failure
+//   dslvm::VERSION                       the bytecode format version this SDK reads (and nothing else: no backward compatibility)
+//   dslvm::sha256 / hex / read_file      helpers the hosts use for the schema binding and files
+//
+// Bytecode v3 (big-endian, fixed widths, IEEE-754 binary64): magic "DSLB", u16 version, sha256(schema bytes), u16 string
+// constants (u16 length + UTF-8), u16 locals, u32 code length, code. Opcodes: enum Op below. The living specification is
+// lmctl-mono lmscript/durable-memory/design/dsl-language.md; the compiler is lmscript's dsl.ts.
+//
+// Guarantees of load(): wrong magic, other version, schema-hash mismatch, truncation, trailing bytes, undecodable
+// instructions, out-of-range constants/locals, jumps that do not land on an instruction start or go backwards (so every
+// program terminates: the language has no loops), missing HALT, undeclared context names, unbound functions/methods and
+// wrong arities are all refused with a message. run() additionally bounds the operand stack (MAX_STACK) and the size of
+// concatenated strings (MAX_STRING_BYTES) and checks value kinds defensively.
 #pragma once
 #include <algorithm>
 #include <cstdint>
@@ -121,6 +141,8 @@ enum Op : uint8_t {
 };
 static const char MAGIC[4] = {'D', 'S', 'L', 'B'};
 static const uint16_t VERSION = 3;
+static const size_t MAX_STACK = 1024;                       // operand stack depth per run
+static const size_t MAX_STRING_BYTES = 16u * 1024u * 1024u; // result size of one CONCAT
 
 class Reader {
  public:
@@ -166,31 +188,32 @@ class Program {
     std::vector<Value> stack, locals(nlocals_);
     Reader r(code_);
     auto pop = [&]() { if (stack.empty()) throw Error("stack underflow"); Value v = std::move(stack.back()); stack.pop_back(); return v; };
+    auto push = [&](Value v) { if (stack.size() >= MAX_STACK) throw Error("operand stack exceeds " + std::to_string(MAX_STACK) + " values"); stack.push_back(std::move(v)); };
     auto jump = [&](int32_t rel) { int64_t target = int64_t(r.pos()) + rel; if (target < 0) throw Error("jump before the code start"); r.seek(size_t(target)); };
     while (true) {
       uint8_t op = r.u8();
       switch (op) {
-        case PUSH_INT: stack.push_back(Value::integer(r.i32())); break;
-        case PUSH_FLOAT: stack.push_back(Value::real(r.f64())); break;
-        case PUSH_STR: stack.push_back(Value::string(consts_[r.u16()])); break;
-        case PUSH_BOOL: stack.push_back(Value::boolean(r.u8() != 0)); break;
+        case PUSH_INT: push(Value::integer(r.i32())); break;
+        case PUSH_FLOAT: push(Value::real(r.f64())); break;
+        case PUSH_STR: push(Value::string(consts_[r.u16()])); break;
+        case PUSH_BOOL: push(Value::boolean(r.u8() != 0)); break;
         case LOAD_LOCAL: {
           uint16_t s = r.u16();
           if (locals[s].kind == Value::VOID) throw Error("local slot " + std::to_string(s) + " read before assignment");
-          stack.push_back(locals[s]); break;
+          push(locals[s]); break;
         }
         case STORE_LOCAL: { uint16_t s = r.u16(); locals[s] = pop(); break; }
         case LOAD_CTX: {
           const std::string& name = consts_[r.u16()];
           void* obj = ctx.get(name);
           if (!obj) throw Error("context variable '" + name + "' was not provided by the host for this run");
-          stack.push_back(Value::object(*reg.context_type(name), obj)); break;
+          push(Value::object(*reg.context_type(name), obj)); break;
         }
         case CALL_FN: {
           const std::string& name = consts_[r.u16()]; uint8_t argc = r.u8();
           Args args(argc); for (int i = argc - 1; i >= 0; --i) args[i] = pop();
           Value result = reg.find_function(name)->second(args);
-          if (result.kind != Value::VOID) stack.push_back(std::move(result));
+          if (result.kind != Value::VOID) push(std::move(result));
           break;
         }
         case CALL_METHOD: {
@@ -199,14 +222,14 @@ class Program {
           Value self = pop();
           if (self.kind != Value::OBJ || self.type != type) throw Error("method " + type + "." + name + " called on a " + (self.kind == Value::OBJ ? self.type : std::string(self.kind_name())));
           Value result = reg.find_method(type, name)->second(self.obj, args);
-          if (result.kind != Value::VOID) stack.push_back(std::move(result));
+          if (result.kind != Value::VOID) push(std::move(result));
           break;
         }
         case EQ: case NE: {
           Value b = pop(), a = pop();
           if (a.kind != b.kind) throw Error(std::string("cannot compare ") + a.kind_name() + " with " + b.kind_name());
           bool eq = a.kind == Value::INT ? a.i == b.i : a.kind == Value::FLOAT ? a.f == b.f : a.kind == Value::STR ? a.s == b.s : a.kind == Value::BOOL ? a.b == b.b : a.obj == b.obj;
-          stack.push_back(Value::boolean(op == EQ ? eq : !eq)); break;
+          push(Value::boolean(op == EQ ? eq : !eq)); break;
         }
         case ADD_I: case SUB_I: case MUL_I: case DIV_I: case LT_I: case LE_I: case GT_I: case GE_I: {
           Value b = pop(), a = pop();
@@ -215,42 +238,42 @@ class Program {
           switch (op) {
             case ADD_I: r64 = x + y; break; case SUB_I: r64 = x - y; break; case MUL_I: r64 = x * y; break;
             case DIV_I: if (y == 0) throw Error("int division by zero"); r64 = x / y; break;  // truncates toward zero
-            case LT_I: stack.push_back(Value::boolean(x < y)); continue; case LE_I: stack.push_back(Value::boolean(x <= y)); continue;
-            case GT_I: stack.push_back(Value::boolean(x > y)); continue; default: stack.push_back(Value::boolean(x >= y)); continue;
+            case LT_I: push(Value::boolean(x < y)); continue; case LE_I: push(Value::boolean(x <= y)); continue;
+            case GT_I: push(Value::boolean(x > y)); continue; default: push(Value::boolean(x >= y)); continue;
           }
           if (r64 > INT32_MAX || r64 < INT32_MIN) throw Error("int overflow: " + std::to_string(r64) + " does not fit a 32-bit int");
-          stack.push_back(Value::integer(int32_t(r64))); break;
+          push(Value::integer(int32_t(r64))); break;
         }
         case ADD_F: case SUB_F: case MUL_F: case DIV_F: case LT_F: case LE_F: case GT_F: case GE_F: {
           Value b = pop(), a = pop();
           if (a.kind != Value::FLOAT || b.kind != Value::FLOAT) throw Error(std::string("float operator applied to ") + a.kind_name() + " and " + b.kind_name());
           switch (op) {
-            case ADD_F: stack.push_back(Value::real(a.f + b.f)); break; case SUB_F: stack.push_back(Value::real(a.f - b.f)); break;
-            case MUL_F: stack.push_back(Value::real(a.f * b.f)); break; case DIV_F: stack.push_back(Value::real(a.f / b.f)); break;  // IEEE: inf/nan allowed
-            case LT_F: stack.push_back(Value::boolean(a.f < b.f)); break; case LE_F: stack.push_back(Value::boolean(a.f <= b.f)); break;
-            case GT_F: stack.push_back(Value::boolean(a.f > b.f)); break; default: stack.push_back(Value::boolean(a.f >= b.f)); break;
+            case ADD_F: push(Value::real(a.f + b.f)); break; case SUB_F: push(Value::real(a.f - b.f)); break;
+            case MUL_F: push(Value::real(a.f * b.f)); break; case DIV_F: push(Value::real(a.f / b.f)); break;  // IEEE: inf/nan allowed
+            case LT_F: push(Value::boolean(a.f < b.f)); break; case LE_F: push(Value::boolean(a.f <= b.f)); break;
+            case GT_F: push(Value::boolean(a.f > b.f)); break; default: push(Value::boolean(a.f >= b.f)); break;
           }
           break;
         }
-        case NEG_I: { Value a = pop(); if (a.kind != Value::INT) throw Error(std::string("int negation applied to ") + a.kind_name()); if (a.i == INT32_MIN) throw Error("int overflow: negating the smallest int"); stack.push_back(Value::integer(-a.i)); break; }
-        case NEG_F: { Value a = pop(); if (a.kind != Value::FLOAT) throw Error(std::string("float negation applied to ") + a.kind_name()); stack.push_back(Value::real(-a.f)); break; }
-        case I2F: { Value a = pop(); if (a.kind != Value::INT) throw Error(std::string("float() applied to ") + a.kind_name()); stack.push_back(Value::real(double(a.i))); break; }
+        case NEG_I: { Value a = pop(); if (a.kind != Value::INT) throw Error(std::string("int negation applied to ") + a.kind_name()); if (a.i == INT32_MIN) throw Error("int overflow: negating the smallest int"); push(Value::integer(-a.i)); break; }
+        case NEG_F: { Value a = pop(); if (a.kind != Value::FLOAT) throw Error(std::string("float negation applied to ") + a.kind_name()); push(Value::real(-a.f)); break; }
+        case I2F: { Value a = pop(); if (a.kind != Value::INT) throw Error(std::string("float() applied to ") + a.kind_name()); push(Value::real(double(a.i))); break; }
         case CONCAT: {
           Value b = pop(), a = pop();
           if (a.kind != Value::STR || b.kind != Value::STR) throw Error(std::string("string + applied to ") + a.kind_name() + " and " + b.kind_name());
-          if (a.s.size() + b.s.size() > 16u * 1024u * 1024u) throw Error("string + result exceeds 16 MiB");
-          stack.push_back(Value::string(a.s + b.s)); break;
+          if (a.s.size() + b.s.size() > MAX_STRING_BYTES) throw Error("string + result exceeds " + std::to_string(MAX_STRING_BYTES) + " bytes");
+          push(Value::string(a.s + b.s)); break;
         }
-        case I2S: { Value a = pop(); if (a.kind != Value::INT) throw Error(std::string("str(int) applied to ") + a.kind_name()); stack.push_back(Value::string(std::to_string(a.i))); break; }
+        case I2S: { Value a = pop(); if (a.kind != Value::INT) throw Error(std::string("str(int) applied to ") + a.kind_name()); push(Value::string(std::to_string(a.i))); break; }
         case F2S: {  // %.15g: the same text poc-numpy prints; deterministic across hosts
           Value a = pop(); if (a.kind != Value::FLOAT) throw Error(std::string("str(float) applied to ") + a.kind_name());
-          char buf[64]; std::snprintf(buf, sizeof buf, "%.15g", a.f); stack.push_back(Value::string(buf)); break;
+          char buf[64]; std::snprintf(buf, sizeof buf, "%.15g", a.f); push(Value::string(buf)); break;
         }
-        case B2S: { Value a = pop(); if (a.kind != Value::BOOL) throw Error(std::string("str(bool) applied to ") + a.kind_name()); stack.push_back(Value::string(a.b ? "true" : "false")); break; }
+        case B2S: { Value a = pop(); if (a.kind != Value::BOOL) throw Error(std::string("str(bool) applied to ") + a.kind_name()); push(Value::string(a.b ? "true" : "false")); break; }
         case NOT: {
           Value a = pop();
           if (a.kind != Value::BOOL) throw Error(std::string("! applied to a ") + a.kind_name());
-          stack.push_back(Value::boolean(!a.b)); break;
+          push(Value::boolean(!a.b)); break;
         }
         case JUMP: jump(r.i32()); break;
         case JUMP_IF_FALSE: case JUMP_IF_TRUE: {
@@ -261,7 +284,7 @@ class Program {
         }
         case DUP: {
           if (stack.empty()) throw Error("stack underflow");
-          stack.push_back(stack.back()); break;
+          push(stack.back()); break;
         }
         case POP: pop(); break;
         case HALT: return;
@@ -318,12 +341,17 @@ class Program {
         case EQ: case NE: case NOT: case DUP: case POP: break;
         case ADD_I: case SUB_I: case MUL_I: case DIV_I: case ADD_F: case SUB_F: case MUL_F: case DIV_F: case NEG_I: case NEG_F:
         case LT_I: case LE_I: case GT_I: case GE_I: case LT_F: case LE_F: case GT_F: case GE_F: case I2F: case CONCAT: case I2S: case F2S: case B2S: break;
-        case JUMP: case JUMP_IF_FALSE: case JUMP_IF_TRUE: { int32_t rel = r.i32(); jumps.emplace_back(r.pos(), int64_t(r.pos()) + rel); break; }
+        case JUMP: case JUMP_IF_FALSE: case JUMP_IF_TRUE: {
+          int32_t rel = r.i32();
+          if (rel < 0) throw Error("jump at offset " + std::to_string(starts.back()) + " goes backwards (the language has no loops; every jump must move forward)");
+          jumps.emplace_back(r.pos(), int64_t(r.pos()) + rel); break;
+        }
         case HALT: halted = true; break;
         default: throw Error("unknown opcode " + std::to_string(op) + " at offset " + std::to_string(starts.back()));
       }
     }
     if (!halted) throw Error("code does not end with HALT");
+    if (nlocals_ > 4096) throw Error("too many locals: " + std::to_string(nlocals_) + " (limit 4096)");
     for (auto& j : jumps) {
       bool ok = j.second >= 0 && std::find(starts.begin(), starts.end(), size_t(j.second)) != starts.end();
       if (!ok) throw Error("jump at offset " + std::to_string(j.first) + " targets " + std::to_string(j.second) + ", not an instruction start");
