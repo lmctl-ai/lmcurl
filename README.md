@@ -141,3 +141,7 @@ value type in the DSL, per-link callbacks in the mirror (R13 says configure, not
 - Host-side validation is where most real errors live (bad verb, header injection, depth range, unset env, HTTP failures); the
   exit-code scheme 2/3/4 separated compiler, host and application failures cleanly, but a structured error channel back to
   lmscript is still missing.
+
+The pinned v4 SDK includes common math (S4): `lerp`, `ease`, `ease_in`, `ease_out`,
+`sin`, `cos`, `sqrt`, `abs`, `floor`, `pow`, `min`, `max`, `clamp`, and `int(float)`.
+These are compiler built-ins, with exact primitive argument types; no host imports are needed.

@@ -213,9 +213,18 @@ enum Op : uint8_t {
   NEG_I = 0x1B, NEG_F = 0x1C, LT_I = 0x1D, LE_I = 0x1E, GT_I = 0x1F, GE_I = 0x20, LT_F = 0x21, LE_F = 0x22, GT_F = 0x23, GE_F = 0x24, I2F = 0x25,
   // v3: string concatenation and str() conversions
   CONCAT = 0x26, I2S = 0x27, F2S = 0x28, B2S = 0x29,
+  // v4 (spec S4): portable primitive math.  The operand is a one-byte function id.
+  MATH = 0x32,
   // v4 (spec S1'): integer remainder (the dividend's sign; zero divisor is a run-time error).
   MOD_I = 0x33,
   FOR_RANGE = 0x2f, FOR_NEXT = 0x31
+};
+enum MathFn : uint8_t {
+  MATH_SIN_F = 0, MATH_COS_F = 1, MATH_SQRT_F = 2, MATH_ABS_F = 3,
+  MATH_FLOOR_F = 4, MATH_POW_F = 5, MATH_MIN_F = 6, MATH_MAX_F = 7,
+  MATH_CLAMP_F = 8, MATH_LERP_F = 9, MATH_EASE_F = 10,
+  MATH_EASE_IN_F = 11, MATH_EASE_OUT_F = 12, MATH_INT_F = 13,
+  MATH_ABS_I = 14, MATH_MIN_I = 15, MATH_MAX_I = 16, MATH_CLAMP_I = 17
 };
 static const char MAGIC[4] = {'D', 'S', 'L', 'B'};
 static const uint16_t VERSION = 4;
@@ -312,6 +321,28 @@ class Program {
     auto push = [&](Value v) { stack.push_back(std::move(v)); };
     auto jump = [&](int32_t rel) { int64_t target = int64_t(r.pos()) + rel; if (target < 0) throw Error("RUN_ERROR", "jump before the code start"); r.seek(size_t(target)); };
     auto wrap = [](uint64_t u) { return from_twos_complement(u); };  // two's complement wraparound through unsigned arithmetic
+    auto min_float = [](double a, double b) {
+      if (std::isnan(a)) return a;
+      if (std::isnan(b)) return b;
+      if (a < b) return a;
+      return b < a ? b : a;  // equal operands, including signed zero, choose the first
+    };
+    auto max_float = [](double a, double b) {
+      if (std::isnan(a)) return a;
+      if (std::isnan(b)) return b;
+      if (a > b) return a;
+      return b > a ? b : a;  // equal operands, including signed zero, choose the first
+    };
+    auto int_from_float = [](double x) -> int64_t {
+      // Java-like narrowing conversion: truncation toward zero, with NaN -> 0
+      // and saturation at the representable endpoints.  The comparisons also
+      // cover infinities; values strictly inside the interval are safe to cast.
+      if (std::isnan(x)) return 0;
+      constexpr double TWO63 = 0x1p63;
+      if (x >= TWO63) return INT64_MAX;
+      if (x <= -TWO63) return INT64_MIN;
+      return static_cast<int64_t>(x);
+    };
     while (true) {
       uint8_t op = r.u8();
       if (stats) ++stats->instructions;
@@ -394,6 +425,33 @@ class Program {
           char buf[64]; std::snprintf(buf, sizeof buf, "%.15g", a.f); push(Value::string(buf)); break;
         }
         case B2S: { Value a = pop(); if (a.kind != Value::BOOL) throw Error(std::string("str(bool) applied to ") + a.kind_name()); push(Value::string(a.b ? "true" : "false")); break; }
+        case MATH: {
+          const uint8_t fn = r.u8();
+          switch (fn) {
+            case MATH_SIN_F: { Value a = pop(); push(Value::real(std::sin(a.f))); break; }
+            case MATH_COS_F: { Value a = pop(); push(Value::real(std::cos(a.f))); break; }
+            case MATH_SQRT_F: { Value a = pop(); push(Value::real(std::sqrt(a.f))); break; }
+            case MATH_ABS_F: { Value a = pop(); push(Value::real(std::fabs(a.f))); break; }
+            case MATH_FLOOR_F: { Value a = pop(); push(Value::real(std::floor(a.f))); break; }
+            case MATH_POW_F: { Value b = pop(), a = pop(); push(Value::real(std::pow(a.f, b.f))); break; }
+            case MATH_MIN_F: { Value b = pop(), a = pop(); push(Value::real(min_float(a.f, b.f))); break; }
+            case MATH_MAX_F: { Value b = pop(), a = pop(); push(Value::real(max_float(a.f, b.f))); break; }
+            case MATH_CLAMP_F: { Value hi = pop(), lo = pop(), x = pop(); push(Value::real(min_float(max_float(x.f, lo.f), hi.f))); break; }
+            case MATH_LERP_F: { Value t = pop(), b = pop(), a = pop(); double d = b.f - a.f; volatile double product = d * t.f; push(Value::real(a.f + product)); break; }
+            case MATH_EASE_F: { Value a = pop(); double t = min_float(max_float(a.f, 0.0), 1.0); volatile double square = t * t; volatile double twice = 2.0 * t; push(Value::real(square * (3.0 - twice))); break; }
+            case MATH_EASE_IN_F: { Value a = pop(); double t = min_float(max_float(a.f, 0.0), 1.0); volatile double square = t * t; push(Value::real(square)); break; }
+            case MATH_EASE_OUT_F: { Value a = pop(); double t = min_float(max_float(a.f, 0.0), 1.0); volatile double d = 1.0 - t; volatile double square = d * d; push(Value::real(1.0 - square)); break; }
+            case MATH_INT_F: { Value a = pop(); push(Value::integer(int_from_float(a.f))); break; }
+            case MATH_ABS_I: { Value a = pop(); push(Value::integer(a.i < 0 ? wrap(0 - uint64_t(a.i)) : a.i)); break; }
+            case MATH_MIN_I: { Value b = pop(), a = pop(); push(Value::integer(a.i < b.i ? a.i : b.i)); break; }
+            case MATH_MAX_I: { Value b = pop(), a = pop(); push(Value::integer(a.i > b.i ? a.i : b.i)); break; }
+            case MATH_CLAMP_I: { Value hi = pop(), lo = pop(), x = pop(); int64_t lower = x.i < lo.i ? lo.i : x.i; push(Value::integer(lower < hi.i ? lower : hi.i)); break; }
+            // The loader structurally rejects unknown IDs before execution.
+            // Bytecode is trusted and R34 adds no run-time validation path.
+            default: break;
+          }
+          break;
+        }
         case NOT: {
           Value a = pop();
           if (a.kind != Value::BOOL) throw Error(std::string("! applied to a ") + a.kind_name());
@@ -495,6 +553,11 @@ class Program {
         case EQ: case NE: case NOT: case DUP: case POP: break;
         case ADD_I: case SUB_I: case MUL_I: case DIV_I: case MOD_I: case ADD_F: case SUB_F: case MUL_F: case DIV_F: case NEG_I: case NEG_F:
         case LT_I: case LE_I: case GT_I: case GE_I: case LT_F: case LE_F: case GT_F: case GE_F: case I2F: case CONCAT: case I2S: case F2S: case B2S: break;
+        case MATH: {
+          const uint8_t fn = r.u8();
+          if (fn > MATH_CLAMP_I) throw Error("LOAD_BAD_BYTECODE", "unknown MATH function " + std::to_string(fn) + " at offset " + std::to_string(pc));
+          break;
+        }
         case JUMP: case JUMP_IF_FALSE: case JUMP_IF_TRUE: {
           int32_t rel = r.i32();
           if (rel < 0) throw Error("LOAD_BAD_BYTECODE", "jump at offset " + std::to_string(pc) + " goes backwards (only FOR_NEXT may jump backward)");

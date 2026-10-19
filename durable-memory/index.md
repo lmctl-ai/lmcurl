@@ -30,3 +30,11 @@ The installed release 0.2.328 emits v3 and is not compatible; no release promoti
 Pinned cpp-dsl-sdk `126b5927dd684044fac0fa17825d6cbeba02b84c`: structured range loops with
 snapshot bounds and compiler-owned counters, structural termination and no runtime budget/cap.
 Use the matching built mono compiler; released 0.2.328 is still v3.
+
+## DSL v4 S4 common math
+
+The vendored SDK now executes MATH (0x32): trig, sqrt/abs/floor, min/max/clamp,
+lerp, ease/ease_in/ease_out, and saturating int(float). These names belong to the
+compiler and need no registry imports. Host behavior/schema is unchanged in this slice.
+The runtime adds no limits or new dynamic checks; integer abs wraps at INT64_MIN.
+Use the matching mono v4 compiler with LMSCRIPT_MIN=0 until a v4 release; see sdk.lock.
