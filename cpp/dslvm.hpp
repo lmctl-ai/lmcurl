@@ -530,8 +530,8 @@ class Program {
   // Static verification: every instruction decodes, every index is in range, ordinary jumps remain in their lexical
   // region (or break exactly one loop), and paired range/while loops nest properly. Imports and context are already bound.
   void verify() {
-    struct Open { uint8_t op; size_t pc, next, exit; uint16_t counter, end; bool tested; size_t parent; };
-    struct LoopRegion { size_t exit, parent; uint8_t op; uint16_t counter, end; };
+    struct Open { uint8_t op; size_t pc, next, exit; uint16_t counter, end; bool tested; size_t parent; size_t test = 0; };
+    struct LoopRegion { size_t exit, parent, test; uint8_t op; uint16_t counter, end; };
     std::vector<VerifiedInstr> insns; std::vector<Open> open; std::vector<std::pair<size_t, int64_t>> ordinary;
     std::vector<std::pair<size_t, int64_t>> while_exits;
     std::map<size_t, LoopRegion> regions;
@@ -609,7 +609,7 @@ class Program {
           if (loop.exit != r.pos()) throw Error("LOAD_BAD_BYTECODE", "FOR_RANGE at offset " + std::to_string(loop.pc) + " must exit immediately after its FOR_NEXT");
           loops_[pc] = Loop{loop.counter, loop.end, loop.next};
           insns.back().target = size_t(int64_t(r.pos()) + rel);
-          regions[loop.pc] = LoopRegion{loop.exit, loop.parent, FOR_RANGE, loop.counter, loop.end};
+          regions[loop.pc] = LoopRegion{loop.exit, loop.parent, 0, FOR_RANGE, loop.counter, loop.end};
           break;
         }
         case WHILE_BEGIN:
@@ -619,7 +619,7 @@ class Program {
           if (rel < 0) throw Error("LOAD_BAD_BYTECODE", "WHILE_TEST at offset " + std::to_string(pc) + " exits backwards");
           if (open.empty() || open.back().op != WHILE_BEGIN) throw Error("LOAD_BAD_BYTECODE", "WHILE_TEST at offset " + std::to_string(pc) + " has no matching WHILE_BEGIN");
           if (open.back().tested) throw Error("LOAD_BAD_BYTECODE", "WHILE_BEGIN at offset " + std::to_string(open.back().pc) + " has more than one WHILE_TEST");
-          open.back().tested = true; open.back().exit = size_t(int64_t(r.pos()) + rel); insns.back().target = open.back().exit; while_exits.emplace_back(pc, int64_t(r.pos()) + rel); break;
+          open.back().test = pc; open.back().tested = true; open.back().exit = size_t(int64_t(r.pos()) + rel); insns.back().target = open.back().exit; while_exits.emplace_back(pc, int64_t(r.pos()) + rel); break;
         }
         case LOOP_BACK: {
           int32_t rel = r.i32();
@@ -628,7 +628,7 @@ class Program {
           if (!loop.tested) throw Error("LOAD_BAD_BYTECODE", "WHILE_BEGIN at offset " + std::to_string(loop.pc) + " has no WHILE_TEST");
           if (int64_t(r.pos()) + rel != int64_t(loop.pc)) throw Error("LOAD_BAD_BYTECODE", "LOOP_BACK at offset " + std::to_string(pc) + " does not target its paired WHILE_BEGIN");
           if (loop.exit != r.pos()) throw Error("LOAD_BAD_BYTECODE", "WHILE_TEST at offset " + std::to_string(loop.pc) + " must exit immediately after its LOOP_BACK");
-          regions[loop.pc] = LoopRegion{loop.exit, loop.parent, WHILE_BEGIN, 0, 0};
+          regions[loop.pc] = LoopRegion{loop.exit, loop.parent, loop.test, WHILE_BEGIN, 0, 0};
           insns.back().target = size_t(int64_t(r.pos()) + rel);
           break;
         }
@@ -644,8 +644,11 @@ class Program {
       const VerifiedInstr* from = find_insn(int64_t(j.first)); const VerifiedInstr* to = find_insn(j.second);
       if (!to) throw Error("LOAD_BAD_BYTECODE", "jump at offset " + std::to_string(j.first) + " targets " + std::to_string(j.second) + ", not an instruction start");
       if (!from) throw Error("LOAD_BAD_BYTECODE", "internal verifier error: missing jump instruction");
-      if (from->owner == to->owner) continue;
       auto loop = regions.find(from->owner);
+      if (loop != regions.end() && loop->second.op == WHILE_BEGIN &&
+          from->pc < loop->second.test && to->pc > loop->second.test)
+        throw Error("LOAD_BAD_BYTECODE", "jump at offset " + std::to_string(from->pc) + " skips its WHILE_TEST");
+      if (from->owner == to->owner) continue;
       if (loop == regions.end() || size_t(j.second) != loop->second.exit || to->owner != loop->second.parent)
         throw Error("LOAD_BAD_BYTECODE", "jump at offset " + std::to_string(j.first) + " crosses a loop boundary (only a break to the innermost loop exit is allowed)");
     }
@@ -736,6 +739,12 @@ class Program {
         if (ix + 1 < insns.size()) merge(in.next, after);
         else throw Error("LOAD_BAD_BYTECODE", "control flow falls past the end of code");
       }
+    }
+    for (size_t ix = 0; ix < insns.size(); ++ix) {
+      const auto& in = insns[ix];
+      if (in.op == WHILE_TEST && incoming[ix] >= 0 &&
+          incoming[ix] != incoming[at.at(in.owner)] + 1)
+        throw Error("LOAD_BAD_BYTECODE", "WHILE_TEST must leave the loop-head stack depth at offset " + std::to_string(in.pc));
     }
   }
   std::vector<std::string> consts_; std::vector<Import> imports_; std::vector<std::string> context_; std::vector<Local> locals_; uint16_t max_stack_ = 0; std::string code_; std::vector<Line> lines_; std::map<size_t, Loop> loops_;

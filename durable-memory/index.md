@@ -51,3 +51,5 @@ signatures per name without dynamic overload dispatch. Self is expanded to the r
 compile/host-schema-read time; the VM adds no identity/type checks or limits. See sdk.lock for pin.
 
 V5 integration verified with mono compiler and SDK f140fa3: test.sh PASS 25 checks; both runtimes pass the same 42 regenerated vectors. No release promotion.
+
+Final v5 verifier refresh: SDK b8fd285, PASS 25 checks; both runtimes pass all 43 regenerated vectors. This supersedes the earlier f140fa3 integration pin.
