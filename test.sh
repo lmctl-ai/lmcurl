@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # End-to-end test of poc-curl. Needs g++ (or CXX), make, node (for the local mock server) and the released lmscript CLI
-# (`npm install -g @lmctl-ai/lmctl`, >= 0.2.328; LMSCRIPT_BIN overrides the binary).
+# (`npm install -g @lmctl-ai/lmctl`, >= 0.2.346; LMSCRIPT_BIN overrides the binary).
 # Everything runs against the local mock; one LIVE LLM call happens only when POC_CURL_LIVE=1 and OPENAI_API_KEY are both set.
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LMSCRIPT="${LMSCRIPT_BIN:-lmscript}"   # the released CLI on PATH (npm install -g @lmctl-ai/lmctl); override with LMSCRIPT_BIN
-MIN_LMSCRIPT="${LMSCRIPT_MIN:-0.2.328}"  # first release with _dsl_ / savedsl; LMSCRIPT_MIN=0 admits a mono build
+MIN_LMSCRIPT="${LMSCRIPT_MIN:-0.2.346}"  # first release emitting bytecode v5 with located errors (staging 0.2.346); LMSCRIPT_MIN=0 admits a mono build
 if ! command -v "$LMSCRIPT" >/dev/null 2>&1 && [ ! -f "$LMSCRIPT" ]; then echo "FAIL: lmscript not found ($LMSCRIPT). Install the released CLI: npm install -g @lmctl-ai/lmctl (>= $MIN_LMSCRIPT), or set LMSCRIPT_BIN." >&2; exit 1; fi
 HAVE_LMSCRIPT="$("$LMSCRIPT" --version 2>/dev/null | sed -n 's/^lmscript //p')"
-if [ -z "$HAVE_LMSCRIPT" ] || [ "$(printf '%s\n%s\n' "$MIN_LMSCRIPT" "$HAVE_LMSCRIPT" | sort -V | head -1)" != "$MIN_LMSCRIPT" ]; then echo "FAIL: lmscript ${HAVE_LMSCRIPT:-unknown} at $LMSCRIPT is too old: _dsl_ needs >= $MIN_LMSCRIPT (npm install -g @lmctl-ai/lmctl@latest) or set LMSCRIPT_BIN." >&2; exit 1; fi
+if [ -z "$HAVE_LMSCRIPT" ] || [ "$(printf '%s\n%s\n' "$MIN_LMSCRIPT" "$HAVE_LMSCRIPT" | sort -V | head -1)" != "$MIN_LMSCRIPT" ]; then echo "FAIL: lmscript ${HAVE_LMSCRIPT:-unknown} at $LMSCRIPT is too old: _dsl_ needs >= $MIN_LMSCRIPT (npm install -g @lmctl-ai/lmctl@staging until latest reaches 0.2.346) or set LMSCRIPT_BIN." >&2; exit 1; fi
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/poc-curl-test-XXXXXX")"
 export HOME="$WORK/home"; mkdir -p "$HOME"
 MOCK_PID=""
