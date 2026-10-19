@@ -1,4 +1,4 @@
-# One LLM call (OpenAI-style chat completion) in one script file (EXPERIMENTAL _dsl_ proof of concept, R22).
+# One LLM call (OpenAI-style chat completion) in one script file (EXPERIMENTAL _dsl_ example).
 # URL, model and prompt are `${}` literals; the API key comes from the HOST environment through env("...") and is never in
 # the script text or the bytecode. The reply text is extracted from the JSON by the host (json_text with a dotted path).
 # Run from the repo root:

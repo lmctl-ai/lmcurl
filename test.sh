@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# End-to-end test of poc-curl. Needs g++ (or CXX), make, node (for the local mock server) and the released lmscript CLI
+# End-to-end test of lmcurl. Needs g++ (or CXX), make, node (for the local mock server) and the released lmscript CLI
 # (`npm install -g @lmctl-ai/lmctl`, >= 0.2.346; LMSCRIPT_BIN overrides the binary).
 # Everything runs against the local mock; one LIVE LLM call happens only when POC_CURL_LIVE=1 and OPENAI_API_KEY are both set.
 set -u
@@ -9,7 +9,7 @@ MIN_LMSCRIPT="${LMSCRIPT_MIN:-0.2.346}"  # first release emitting bytecode v5 wi
 if ! command -v "$LMSCRIPT" >/dev/null 2>&1 && [ ! -f "$LMSCRIPT" ]; then echo "FAIL: lmscript not found ($LMSCRIPT). Install the released CLI: npm install -g @lmctl-ai/lmctl (>= $MIN_LMSCRIPT), or set LMSCRIPT_BIN." >&2; exit 1; fi
 HAVE_LMSCRIPT="$("$LMSCRIPT" --version 2>/dev/null | sed -n 's/^lmscript //p')"
 if [ -z "$HAVE_LMSCRIPT" ] || [ "$(printf '%s\n%s\n' "$MIN_LMSCRIPT" "$HAVE_LMSCRIPT" | sort -V | head -1)" != "$MIN_LMSCRIPT" ]; then echo "FAIL: lmscript ${HAVE_LMSCRIPT:-unknown} at $LMSCRIPT is too old: _dsl_ needs >= $MIN_LMSCRIPT (npm install -g @lmctl-ai/lmctl@latest) or set LMSCRIPT_BIN." >&2; exit 1; fi
-WORK="$(mktemp -d "${TMPDIR:-/tmp}/poc-curl-test-XXXXXX")"
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/lmcurl-test-XXXXXX")"
 export HOME="$WORK/home"; mkdir -p "$HOME"
 MOCK_PID=""
 fail() { echo "FAIL: $*" >&2; exit 1; }
@@ -28,15 +28,15 @@ make -C "$HERE" BUILD="$WORK/build" >"$WORK/make.log" 2>&1 || { cat "$WORK/make.
 HOST="$WORK/build/curlhost"
 grep -q -- "-DHAVE_OPENSSL" "$WORK/make.log" && TLS=yes || TLS=no
 ok "C++ host builds (TLS via OpenSSL: $TLS)"
-# 1b. Registry versus schema (spec v4 S0, A02): the host's declared signatures must equal the schema's.
+# 1b. The host's declared signatures must equal the schema's declarations.
 if "$LMSCRIPT" --dsl-signatures "$SCHEMA" >"$WORK/schema.sigs" 2>/dev/null; then
   "$HOST" --dsl-signatures >"$WORK/host.sigs" || fail "host --dsl-signatures"
   diff -u "$WORK/schema.sigs" "$WORK/host.sigs" >"$WORK/sigs.diff" || { cat "$WORK/sigs.diff"; fail "registry signatures differ from the schema"; }
   ok "registry signatures equal the schema's ($(wc -l <"$WORK/host.sigs") entries, lmscript --dsl-signatures)"
 else
-  echo "skip - lmscript $HAVE_LMSCRIPT has no --dsl-signatures yet (lands in the release after 0.2.330); the host declares $("$HOST" --dsl-signatures | wc -l) signatures"
+  echo "skip - lmscript $HAVE_LMSCRIPT has no --dsl-signatures yet (lands in the released CLI); the host declares $("$HOST" --dsl-signatures | wc -l) signatures"
 fi
-# stdout is exactly one JSON result line (spec v4 S0, A03); out.print lines travel in result.output, in order.
+# stdout is exactly one JSON result line; out.print lines travel in result.output, in order.
 out_lines() { python3 -I -c 'import json,sys; d=json.load(sys.stdin); assert d["ok"] is True, d; print("\n".join(d["result"]["output"]))'; }
 node "$HERE/tools/mock-server.mjs" 0 >"$WORK/mock.out" 2>&1 &
 MOCK_PID=$!
@@ -60,7 +60,7 @@ echo "$OUT" | sed -n 3p | node -e '
 const r=JSON.parse(require("fs").readFileSync(0,"utf8"));
 if(r.method!=="POST")throw Error("method "+r.method);
 if(r.headers["content-type"]!=="application/json"||r.headers["x-trace"]!=="post-example")throw Error("headers "+JSON.stringify(r.headers));
-const body=JSON.parse(r.body);if(body.name!=="poc-curl"||body.answer!==42||body.quote!=="he said \"hi\""||body.tags.join()!=="dsl,post")throw Error("body "+r.body);
+const body=JSON.parse(r.body);if(body.name!=="lmcurl"||body.answer!==42||body.quote!=="he said \"hi\""||body.tags.join()!=="dsl,post")throw Error("body "+r.body);
 if(r.headers["content-length"]!==String(Buffer.byteLength(r.body)))throw Error("content-length");' || fail "echoed request differs"
 ok "post.lms: POST /echo with JSON body and two headers, status 200, exact body echoed"
 

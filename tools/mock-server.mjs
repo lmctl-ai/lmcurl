@@ -1,4 +1,4 @@
-// Local, deterministic mock for the poc-curl tests (node, no dependencies). Prints `listening on PORT` and serves:
+// Local, deterministic mock for the lmcurl tests (node, no dependencies). Prints `listening on PORT` and serves:
 //   POST /echo                 -> JSON {method, path, headers (lowercased), body}
 //   POST /v1/chat/completions  -> OpenAI-style chat completion; requires `Authorization: Bearer test-key`; the reply repeats
 //                                 the last user message so the test can assert extraction; 401 without the key; 400 on bad JSON

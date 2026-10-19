@@ -134,7 +134,7 @@ class Connection {
 inline Response fetch_once(const std::string& url, const std::string& method, const std::vector<std::pair<std::string, std::string>>& headers, const std::string& body, const Options& opt) {
   Url u = parse_url(url);
   Connection c(u, opt.timeoutMs);
-  std::string req = method + " " + u.path + " HTTP/1.1\r\nHost: " + u.host + ((u.scheme == "http" && u.port == 80) || (u.scheme == "https" && u.port == 443) ? "" : ":" + std::to_string(u.port)) + "\r\nConnection: close\r\nUser-Agent: poc-curl/0.1\r\n";
+  std::string req = method + " " + u.path + " HTTP/1.1\r\nHost: " + u.host + ((u.scheme == "http" && u.port == 80) || (u.scheme == "https" && u.port == 443) ? "" : ":" + std::to_string(u.port)) + "\r\nConnection: close\r\nUser-Agent: lmcurl/0.1\r\n";
   bool hasLength = false;
   for (auto& h : headers) { req += h.first + ": " + h.second + "\r\n"; if (lower(h.first) == "content-length") hasLength = true; }
   if ((!body.empty() || method == "POST" || method == "PUT" || method == "PATCH") && !hasLength) req += "Content-Length: " + std::to_string(body.size()) + "\r\n";

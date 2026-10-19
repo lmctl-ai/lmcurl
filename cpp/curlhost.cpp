@@ -1,4 +1,4 @@
-// poc-curl host (R12, R22): a curl-like program driven by a DSL chunk. It starts, builds its registry (Request builder,
+// lmcurl host: a curl-like program driven by a DSL chunk. It starts, builds its registry (Request builder,
 // Response, Mirror crawler, Output, env/has_env/json_escape), loads the bytecode, runs the chunk once with `out` as context,
 // then continues: it flushes output and exits with a clear code (0 ok, 1 load error, 3 DSL run-time error, 4 out.fail()).
 #include "dslvm.hpp"
@@ -141,8 +141,8 @@ MirrorResult run_mirror(const Mirror& m, Output&, std::ostream& log) {
 }
 
 // (1) The registry: the implementation of schema/curl.dsl.json, declared with the schema's types so `--dsl-signatures`
-// can be diffed against `lmscript --dsl-signatures schema/curl.dsl.json` (spec v4 S0, A02). The types are declarations
-// only: the compiler checked every call, the VM trusts the bytecode (R33/R34).
+// can be diffed against `lmscript --dsl-signatures schema/curl.dsl.json` (runtime result protocol).. The types are declarations
+// only: the compiler checked every call, the VM trusts the bytecode (/).
 void register_schema(dslvm::Registry& reg, Arena& arena, Output& output) {
   reg.context("out", "Output");
   auto req = [](void* p) { return static_cast<Request*>(p); }; auto self = [](void* p) { return dslvm::Value::object("Request", p); };
@@ -216,7 +216,7 @@ int main(int argc, char** argv) {
   dslvm::Registry reg;
   register_schema(reg, arena, output);
 
-  // (2) Load and verify the DSL; nothing has happened yet. A refusal is one JSON line, phase load, exit 3 (spec v4 S0, A03).
+  // (2) Load and verify the DSL; nothing has happened yet. A refusal is one JSON line, phase load, exit 3 (runtime result protocol)..
   dslvm::Program program;
   try { program = dslvm::Program::load(dslvm::read_file(dslPath), dslvm::read_file(schemaPath), reg); }
   catch (const dslvm::Error& e) { std::cerr << "error: " << dslPath << ": " << e.what() << "\n"; return dslvm::report_error("load", e); }

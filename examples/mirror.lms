@@ -1,4 +1,4 @@
-# Mirror a static website (EXPERIMENTAL _dsl_ proof of concept, R22). The DSL does not loop (R13): the host provides the
+# Mirror a static website (EXPERIMENTAL _dsl_ example). The DSL does not loop: the host provides the
 # crawler and the chunk CONFIGURES it (start URL, depth, same host only, allowed content types, output directory, limits),
 # then reports the result. Files land under OUT_DIR/host[_port]/path (index.html for directories; no path traversal).
 # Run from the repo root: $LMSCRIPT_BIN examples/mirror.lms build/mirror.dslb [START_URL] [OUT_DIR] [DEPTH]

@@ -1,10 +1,10 @@
-# One self-contained POST (EXPERIMENTAL _dsl_ proof of concept, R22): no shell quoting, no long command line.
+# One self-contained POST (EXPERIMENTAL _dsl_ public example): no shell quoting, no long command line.
 # The JSON body is built here in lmscript (json_stringify) and handed to the DSL as a `${}` literal; the DSL configures the
 # request on the host's builder and prints what came back.
 # Run from the repo root: $LMSCRIPT_BIN examples/post.lms [OUT.dslb] [URL]   then   build/curlhost --dsl OUT.dslb --schema schema/curl.dsl.json
 out = ARGV.len() > 0 ? ARGV[0] : "build/post.dslb";
 url = ARGV.len() > 1 ? ARGV[1] : "http://127.0.0.1:8080/echo";
-payload = json_stringify({name: "poc-curl", tags: ["dsl", "post"], answer: 42, quote: "he said \"hi\""});
+payload = json_stringify({name: "lmcurl", tags: ["dsl", "post"], answer: 42, quote: "he said \"hi\""});
 program = _dsl_ schema="../schema/curl.dsl.json";
 let res = request()
   .method("POST")

@@ -16,5 +16,5 @@ fi
 [ -f "$SDK/include/dslvm.hpp" ] || { echo "cpp-dsl-sdk checkout not found at $SDK (set CPP_DSL_SDK)" >&2; exit 1; }
 cp "$SDK/include/dslvm.hpp" "$HEADER"
 commit="$(git -C "$SDK" rev-parse HEAD)"; dirty=""; git -C "$SDK" diff --quiet -- include/dslvm.hpp || dirty=" (uncommitted changes in the SDK checkout)"
-printf 'repo=https://github.com/lmctlhq/cpp-dsl-sdk\ncommit=%s\nsha256=%s\n' "$commit" "$(hash "$HEADER")" >"$LOCK"
+printf 'repo=https://github.com/lmctl-ai/cpp-dsl-sdk\ncommit=%s\nsha256=%s\n' "$commit" "$(hash "$HEADER")" >"$LOCK"
 echo "synced cpp/dslvm.hpp from cpp-dsl-sdk $commit$dirty"
