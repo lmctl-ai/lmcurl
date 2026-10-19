@@ -1,5 +1,10 @@
 # poc-curl: a curl-like C++ HTTP host driven by the DSL
 
+**S1′ compiler pairing:** this checkout reads bytecode v4 only. Until a v4 compiler is released,
+use `LMSCRIPT_MIN=0 LMSCRIPT_BIN=../lmctl-mono/lmscript/bin/lmscript bash test.sh` with a built
+mono checkout. Released lmscript 0.2.328 emits v3 and is deliberately refused.
+
+
 Status: EXPERIMENTAL proof of concept for the lmscript `_dsl_` framework (lmctl-mono `lmscript/durable-memory/requirements/dsl-bytecode.md`
 R12-R16, R20, R22; living language spec `lmscript/durable-memory/design/dsl-language.md`, bytecode v4). Nothing here is an accepted
 design. Run on 2026-10-18 with g++ 11, Node 26, OpenSSL 3 and lmscript 0.2.328 / 0.2.330.

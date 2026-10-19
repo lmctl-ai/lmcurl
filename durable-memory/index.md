@@ -15,3 +15,12 @@ Team guide: lmctl-mono `lmscript/durable-memory/dsl-framework.md`. Requirements 
 | [03-build-run-test.md](03-build-run-test.md) | commands, mock server, exact expectations, the opt-in live call |
 | [04-gotchas.md](04-gotchas.md) | header pin, TLS availability, redirect semantics, mock dependence, shared box |
 | [05-open-items.md](05-open-items.md) | next steps |
+
+## DSL v4 base — S1′ (2026-10-18)
+
+Pinned cpp-dsl-sdk `cd7396b11cf175cffa8028fec1de29635051355a`: canonical imports,
+context/locals/max_stack/line sections, wrapping i64 integers and remainder, no VM resource caps.
+Collections and domain checks remain host-owned. No loops/math/overloads from later slices yet.
+`LMSCRIPT_MIN=0 LMSCRIPT_BIN=../lmctl-mono/lmscript/bin/lmscript nice bash test.sh`
+passed 25 checks against the built v4 compiler (all builds/tests run sequentially).
+The installed release 0.2.328 emits v3 and is not compatible; no release promotion occurred.

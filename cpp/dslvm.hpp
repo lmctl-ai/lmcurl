@@ -5,7 +5,7 @@
 //   dslvm::Error                         exception for load, verify and run-time failures: what() names the problem; code is one of
 //                                        LOAD_BAD_BYTECODE, LOAD_SCHEMA_MISMATCH, LOAD_UNBOUND, RUN_ERROR (VM), RUN_HOST (thrown by a host
 //                                        closure), APP_FAIL (the host's own application failure, see report_app_failure)
-//   dslvm::Value                         tagged value: VOID, INT (int32), FLOAT (binary64), STR (UTF-8), BOOL, OBJ (host pointer + schema type name)
+//   dslvm::Value                         tagged value: VOID, INT (int64, two's complement), FLOAT (binary64), STR (UTF-8), BOOL, OBJ (host pointer + schema type name)
 //   dslvm::Args                          std::vector<Value> of call arguments, in order
 //   dslvm::Registry                      the implementation of the schema, declared with its types: function(name, {param types}, return
 //                                        type, fn), method(type, name, {param types}, return type, fn), context(name, type); duplicates are
@@ -13,22 +13,32 @@
 //                                        host test diffs registry and schema (spec v4 S0, a consistency check between two sources of truth,
 //                                        not a run-time defense: R33/R34, the VM checks nothing at call time)
 //   dslvm::Context                       the live objects of one run: set(name, pointer)
-//   dslvm::Program::load(bytes, schema, registry)  parses, binds and verifies; throws before anything runs
-//   dslvm::Program::run(context, registry)         executes the chunk once; throws dslvm::Error on a run-time failure
+//   dslvm::Program::load(bytes, schema, registry)  parses, binds and verifies; throws before anything runs. The Program keeps
+//                                        pointers to entries in that Registry: keep the same Registry alive and unchanged until
+//                                        the Program is destroyed.
+//   dslvm::Program::run(context, registry)         executes the chunk once; pass the same unchanged Registry used by load()
+//                                        (the argument remains in the public host API); throws dslvm::Error on a run-time failure
 //   dslvm::report_ok / report_error / report_app_failure   the standard one-line JSON result on stdout (spec v4 D7, R26) and the
 //                                        exit-code convention 2 compile (lmscript) / 3 host (load or run) / 4 application
 //   dslvm::VERSION                       the bytecode format version this SDK reads (and nothing else: no backward compatibility)
 //   dslvm::sha256 / hex / read_file      helpers the hosts use for the schema binding and files
 //
-// Bytecode v3 (big-endian, fixed widths, IEEE-754 binary64): magic "DSLB", u16 version, sha256(schema bytes), u16 string
-// constants (u16 length + UTF-8), u16 locals, u32 code length, code. Opcodes: enum Op below. The living specification is
-// lmctl-mono lmscript/durable-memory/design/dsl-language.md; the compiler is lmscript's dsl.ts.
+// Bytecode v4 (big-endian, fixed widths, IEEE-754 binary64; spec v4 S1'): magic "DSLB", u16 version 4, sha256(schema bytes);
+// constants: u32 count, each u8 tag (1 = string) + u32 length + UTF-8; imports: u16 count, each u32 constant index of a canonical
+// signature (`fn NAME(T1, T2) -> R`, `method Type.name(T1) -> R`) resolved against the registry at load; context: u16 count,
+// each (u32 name constant, u32 type constant) checked against the registry's declarations; locals: u16 count, each (u32 type-name
+// constant, u8 hidden flag); u16 max_stack (the compiler's measured operand-stack depth: the VM reserves it, nothing is checked
+// against it); code: u32 length + code ending with HALT; lines: u32 count, each (u32 pc, u32 line, u16 column), may be empty.
+// Opcodes: enum Op below (PUSH_INT carries an i64, PUSH_STR a u32 constant index, LOAD_CTX a u16 context index, CALL_FN and
+// CALL_METHOD a u16 import index + u8 argc). Int arithmetic is 64-bit two's complement with wraparound (no overflow trap, R34);
+// division and remainder by zero are run-time errors. The living specification is lmctl-mono
+// lmscript/durable-memory/design/dsl-language.md; the compiler is lmscript's dsl.ts.
 //
-// Guarantees of load(): wrong magic, other version, schema-hash mismatch, truncation, trailing bytes, undecodable
-// instructions, out-of-range constants/locals, jumps that do not land on an instruction start or go backwards (so every
-// program terminates: the language has no loops), missing HALT, undeclared context names, unbound functions/methods and
-// wrong arities are all refused with a message. run() additionally bounds the operand stack (MAX_STACK) and the size of
-// concatenated strings (MAX_STRING_BYTES) and checks value kinds defensively.
+// Guarantees of load(): wrong magic, other version (including v3), schema-hash mismatch, truncation, trailing bytes, unknown
+// constant tags, undecodable instructions, out-of-range constants/locals/imports/context indices, jumps that do not land on an
+// instruction start or go backwards (so every program terminates: the language has no loops), missing HALT, context declarations
+// and import signatures the registry does not provide are all refused with a message. The language and the VM impose no
+// memory or time limits (operator decision, 2026-10-18): there is no stack cap, no locals cap and no string-size cap.
 #pragma once
 #include <algorithm>
 #include <cstdint>
@@ -104,9 +114,9 @@ inline std::string hex(const std::string& bytes) {
 // ---- Values ----
 struct Value {
   enum Kind { VOID, INT, FLOAT, STR, BOOL, OBJ } kind = VOID;
-  int32_t i = 0; double f = 0.0; std::string s; bool b = false; void* obj = nullptr; std::string type;  // type: schema type name of obj
+  int64_t i = 0; double f = 0.0; std::string s; bool b = false; void* obj = nullptr; std::string type;  // type: schema type name of obj
   static Value none() { return Value(); }
-  static Value integer(int32_t v) { Value x; x.kind = INT; x.i = v; return x; }
+  static Value integer(int64_t v) { Value x; x.kind = INT; x.i = v; return x; }
   static Value real(double v) { Value x; x.kind = FLOAT; x.f = v; return x; }
   static Value string(std::string v) { Value x; x.kind = STR; x.s = std::move(v); return x; }
   static Value boolean(bool v) { Value x; x.kind = BOOL; x.b = v; return x; }
@@ -150,6 +160,17 @@ class Registry {
   const FunctionEntry* find_function(const std::string& name) const { auto it = functions_.find(name); return it == functions_.end() ? nullptr : &it->second; }
   const MethodEntry* find_method(const std::string& type, const std::string& name) const { auto it = methods_.find(type + "." + name); return it == methods_.end() ? nullptr : &it->second; }
   const std::string* context_type(const std::string& name) const { auto it = context_.find(name); return it == context_.end() ? nullptr : &it->second; }
+  // The entry whose canonical string is `fn NAME(...) -> R`; null when the host declares no such signature (the loader names
+  // the host's own signature for that name in its message, so a type drift between schema and host is one line to read).
+  const FunctionEntry* function_by_signature(const std::string& canonical) const { for (auto& f : functions_) if ("fn " + f.first + signature_text(f.second.sig) == canonical) return &f.second; return nullptr; }
+  const MethodEntry* method_by_signature(const std::string& canonical) const { for (auto& m : methods_) if ("method " + m.first + signature_text(m.second.sig) == canonical) return &m.second; return nullptr; }
+  std::string declared_for(const std::string& canonical) const {  // "the host declares fn x(float) -> int" or "" when the name is unknown
+    size_t sp = canonical.find(' '), par = canonical.find('(');
+    if (sp == std::string::npos || par == std::string::npos || par < sp) return "";
+    std::string name = canonical.substr(sp + 1, par - sp - 1);
+    if (canonical.compare(0, 3, "fn ") == 0) { auto f = functions_.find(name); return f == functions_.end() ? "" : "fn " + name + signature_text(f->second.sig); }
+    auto m = methods_.find(name); return m == methods_.end() ? "" : "method " + name + signature_text(m->second.sig);
+  }
  private:
   std::map<std::string, FunctionEntry> functions_;
   std::map<std::string, MethodEntry> methods_;
@@ -189,13 +210,17 @@ enum Op : uint8_t {
   PUSH_FLOAT = 0x12, ADD_I = 0x13, SUB_I = 0x14, MUL_I = 0x15, DIV_I = 0x16, ADD_F = 0x17, SUB_F = 0x18, MUL_F = 0x19, DIV_F = 0x1A,
   NEG_I = 0x1B, NEG_F = 0x1C, LT_I = 0x1D, LE_I = 0x1E, GT_I = 0x1F, GE_I = 0x20, LT_F = 0x21, LE_F = 0x22, GT_F = 0x23, GE_F = 0x24, I2F = 0x25,
   // v3: string concatenation and str() conversions
-  CONCAT = 0x26, I2S = 0x27, F2S = 0x28, B2S = 0x29
+  CONCAT = 0x26, I2S = 0x27, F2S = 0x28, B2S = 0x29,
+  // v4 (spec S1'): integer remainder (the dividend's sign; zero divisor is a run-time error).
+  MOD_I = 0x33
 };
 static const char MAGIC[4] = {'D', 'S', 'L', 'B'};
-static const uint16_t VERSION = 3;
-static const size_t MAX_STACK = 1024;                       // operand stack depth per run
-static const size_t MAX_STRING_BYTES = 16u * 1024u * 1024u; // result size of one CONCAT
-
+static const uint16_t VERSION = 4;
+// Convert the wire representation explicitly so decoding does not depend on whether a C++ implementation
+// defines an out-of-range unsigned-to-signed conversion as a two's-complement reinterpretation.
+inline int64_t from_twos_complement(uint64_t u) {
+  return u <= uint64_t(INT64_MAX) ? static_cast<int64_t>(u) : -1 - static_cast<int64_t>(~u);
+}
 class Reader {
  public:
   explicit Reader(const std::string& bytes) : b_(&bytes) {}
@@ -204,6 +229,7 @@ class Reader {
   uint16_t u16() { need(2); uint16_t v = (uint16_t(uint8_t((*b_)[pos_])) << 8) | uint8_t((*b_)[pos_+1]); pos_ += 2; return v; }
   uint32_t u32() { need(4); uint32_t v = 0; for (int i = 0; i < 4; ++i) v = (v << 8) | uint8_t((*b_)[pos_+i]); pos_ += 4; return v; }
   int32_t i32() { return static_cast<int32_t>(u32()); }
+  int64_t i64() { need(8); uint64_t v = 0; for (int i = 0; i < 8; ++i) v = (v << 8) | uint8_t((*b_)[pos_+i]); pos_ += 8; return from_twos_complement(v); }
   double f64() { need(8); uint64_t bits = 0; for (int i = 0; i < 8; ++i) bits = (bits << 8) | uint8_t((*b_)[pos_+i]); pos_ += 8; double d; std::memcpy(&d, &bits, 8); return d; }
   std::string bytes(size_t n) { need(n); std::string s = b_->substr(pos_, n); pos_ += n; return s; }
   size_t pos() const { return pos_; }
@@ -215,6 +241,10 @@ class Reader {
 
 class Program {
  public:
+  struct Import { const FunctionEntry* fn = nullptr; const MethodEntry* method = nullptr; std::string type, name; };
+  struct Local { std::string type; bool hidden = false; };
+  struct Line { uint32_t pc, line; uint16_t column; };
+
   // Parses, binds and verifies. Nothing executes here. Throws dslvm::Error with a message naming the problem.
   static Program load(const std::string& bytecode, const std::string& schemaBytes, const Registry& reg) {
     Program p;
@@ -225,29 +255,64 @@ class Program {
     if (version != VERSION) throw Error("LOAD_BAD_BYTECODE", "unsupported bytecode version " + std::to_string(version) + " (this runtime reads version " + std::to_string(VERSION) + ")");
     std::string hash = r.bytes(32), expected = sha256(schemaBytes);
     if (hash != expected) throw Error("LOAD_SCHEMA_MISMATCH", "schema mismatch: bytecode was compiled against schema sha256 " + hex(hash) + ", the given schema has sha256 " + hex(expected));
-    uint16_t nconst = r.u16();
-    for (uint16_t i = 0; i < nconst; ++i) { uint16_t len = r.u16(); p.consts_.push_back(r.bytes(len)); }
-    p.nlocals_ = r.u16();
+    uint32_t nconst = r.u32();
+    for (uint32_t i = 0; i < nconst; ++i) {
+      uint8_t tag = r.u8();
+      if (tag != 1) throw Error("LOAD_BAD_BYTECODE", "constant " + std::to_string(i) + " has unknown tag " + std::to_string(tag) + " (1 = string)");
+      uint32_t len = r.u32(); p.consts_.push_back(r.bytes(len));
+    }
+    auto cidx = [&](uint32_t i, const char* what) -> const std::string& { if (i >= p.consts_.size()) throw Error("LOAD_BAD_BYTECODE", std::string(what) + ": constant index " + std::to_string(i) + " out of range (" + std::to_string(p.consts_.size()) + " constants)"); return p.consts_[i]; };
+    uint16_t nimports = r.u16();
+    for (uint16_t i = 0; i < nimports; ++i) {
+      const std::string& canonical = cidx(r.u32(), "import");
+      Import imp;
+      if (canonical.compare(0, 3, "fn ") == 0) imp.fn = reg.function_by_signature(canonical);
+      else if (canonical.compare(0, 7, "method ") == 0) {
+        imp.method = reg.method_by_signature(canonical);
+        size_t dot = canonical.find('.'), par = canonical.find('(');
+        if (dot != std::string::npos && par != std::string::npos && dot < par) { imp.type = canonical.substr(7, dot - 7); imp.name = canonical.substr(dot + 1, par - dot - 1); }
+      }
+      if (!imp.fn && !imp.method) {
+        std::string have = reg.declared_for(canonical);
+        throw Error("LOAD_UNBOUND", "import '" + canonical + "' is not provided by the host" + (have.empty() ? "" : " (the host declares " + have + ")"));
+      }
+      p.imports_.push_back(std::move(imp));
+    }
+    uint16_t ncontext = r.u16();
+    for (uint16_t i = 0; i < ncontext; ++i) {
+      const std::string& name = cidx(r.u32(), "context name"); const std::string& type = cidx(r.u32(), "context type");
+      const std::string* declared = reg.context_type(name);
+      if (!declared) throw Error("LOAD_UNBOUND", "context variable '" + name + "' is not declared by the host");
+      if (*declared != type) throw Error("LOAD_UNBOUND", "context variable '" + name + "' is declared as " + type + " by the bytecode, the host provides " + *declared);
+      p.context_.push_back(name);
+    }
+    uint16_t nlocals = r.u16();
+    for (uint16_t i = 0; i < nlocals; ++i) { Local l; l.type = cidx(r.u32(), "local type"); uint8_t hidden = r.u8(); if (hidden > 1) throw Error("LOAD_BAD_BYTECODE", "local " + std::to_string(i) + " hidden flag must be 0 or 1"); l.hidden = hidden == 1; p.locals_.push_back(std::move(l)); }
+    p.max_stack_ = r.u16();
     uint32_t codeLen = r.u32();
     p.code_ = r.bytes(codeLen);
-    if (!r.done()) throw Error("LOAD_BAD_BYTECODE", "bytecode has " + std::to_string(bytecode.size() - r.pos()) + " trailing byte(s) after the code section");
-    p.verify(reg);
+    uint32_t nlines = r.u32();
+    for (uint32_t i = 0; i < nlines; ++i) { Line l; l.pc = r.u32(); l.line = r.u32(); l.column = r.u16(); if (i && l.pc < p.lines_[i - 1].pc) throw Error("LOAD_BAD_BYTECODE", "line table is not sorted by pc at entry " + std::to_string(i)); p.lines_.push_back(l); }
+    if (!r.done()) throw Error("LOAD_BAD_BYTECODE", "bytecode has " + std::to_string(bytecode.size() - r.pos()) + " trailing byte(s) after the line table");
+    p.verify();
     return p;
   }
 
   // Executes the chunk once. The host's objects come from ctx (declared names only).
   void run(const Context& ctx, const Registry& reg) const {
-    std::vector<Value> stack, locals(nlocals_);
+    std::vector<Value> stack, locals(locals_.size());
+    stack.reserve(max_stack_);
     Reader r(code_);
     auto pop = [&]() { if (stack.empty()) throw Error("RUN_ERROR", "stack underflow"); Value v = std::move(stack.back()); stack.pop_back(); return v; };
-    auto push = [&](Value v) { if (stack.size() >= MAX_STACK) throw Error("RUN_ERROR", "operand stack exceeds " + std::to_string(MAX_STACK) + " values"); stack.push_back(std::move(v)); };
+    auto push = [&](Value v) { stack.push_back(std::move(v)); };
     auto jump = [&](int32_t rel) { int64_t target = int64_t(r.pos()) + rel; if (target < 0) throw Error("RUN_ERROR", "jump before the code start"); r.seek(size_t(target)); };
+    auto wrap = [](uint64_t u) { return from_twos_complement(u); };  // two's complement wraparound through unsigned arithmetic
     while (true) {
       uint8_t op = r.u8();
       switch (op) {
-        case PUSH_INT: push(Value::integer(r.i32())); break;
+        case PUSH_INT: push(Value::integer(r.i64())); break;
         case PUSH_FLOAT: push(Value::real(r.f64())); break;
-        case PUSH_STR: push(Value::string(consts_[r.u16()])); break;
+        case PUSH_STR: push(Value::string(consts_[r.u32()])); break;
         case PUSH_BOOL: push(Value::boolean(r.u8() != 0)); break;
         case LOAD_LOCAL: {
           uint16_t s = r.u16();
@@ -256,24 +321,24 @@ class Program {
         }
         case STORE_LOCAL: { uint16_t s = r.u16(); locals[s] = pop(); break; }
         case LOAD_CTX: {
-          const std::string& name = consts_[r.u16()];
+          const std::string& name = context_[r.u16()];
           void* obj = ctx.get(name);
           if (!obj) throw Error("RUN_ERROR", "context variable '" + name + "' was not provided by the host for this run");
           push(Value::object(*reg.context_type(name), obj)); break;
         }
         case CALL_FN: {
-          const std::string& name = consts_[r.u16()]; uint8_t argc = r.u8();
+          const Import& imp = imports_[r.u16()]; uint8_t argc = r.u8();
           Args args(argc); for (int i = argc - 1; i >= 0; --i) args[i] = pop();
-          Value result = reg.find_function(name)->fn(args);
+          Value result = imp.fn->fn(args);
           if (result.kind != Value::VOID) push(std::move(result));
           break;
         }
         case CALL_METHOD: {
-          const std::string& type = consts_[r.u16()]; const std::string& name = consts_[r.u16()]; uint8_t argc = r.u8();
+          const Import& imp = imports_[r.u16()]; uint8_t argc = r.u8();
           Args args(argc); for (int i = argc - 1; i >= 0; --i) args[i] = pop();
           Value self = pop();
-          if (self.kind != Value::OBJ || self.type != type) throw Error("RUN_ERROR", "method " + type + "." + name + " called on a " + (self.kind == Value::OBJ ? self.type : std::string(self.kind_name())));
-          Value result = reg.find_method(type, name)->fn(self.obj, args);
+          if (self.kind != Value::OBJ || self.type != imp.type) throw Error("RUN_ERROR", "method " + imp.type + "." + imp.name + " called on a " + (self.kind == Value::OBJ ? self.type : std::string(self.kind_name())));
+          Value result = imp.method->fn(self.obj, args);
           if (result.kind != Value::VOID) push(std::move(result));
           break;
         }
@@ -283,18 +348,20 @@ class Program {
           bool eq = a.kind == Value::INT ? a.i == b.i : a.kind == Value::FLOAT ? a.f == b.f : a.kind == Value::STR ? a.s == b.s : a.kind == Value::BOOL ? a.b == b.b : a.obj == b.obj;
           push(Value::boolean(op == EQ ? eq : !eq)); break;
         }
-        case ADD_I: case SUB_I: case MUL_I: case DIV_I: case LT_I: case LE_I: case GT_I: case GE_I: {
+        case ADD_I: case SUB_I: case MUL_I: case DIV_I: case MOD_I: case LT_I: case LE_I: case GT_I: case GE_I: {
           Value b = pop(), a = pop();
           if (a.kind != Value::INT || b.kind != Value::INT) throw Error(std::string("int operator applied to ") + a.kind_name() + " and " + b.kind_name());
-          int64_t x = a.i, y = b.i, r64 = 0;
+          int64_t x = a.i, y = b.i; uint64_t ux = uint64_t(x), uy = uint64_t(y);
           switch (op) {
-            case ADD_I: r64 = x + y; break; case SUB_I: r64 = x - y; break; case MUL_I: r64 = x * y; break;
-            case DIV_I: if (y == 0) throw Error("RUN_ERROR", "int division by zero"); r64 = x / y; break;  // truncates toward zero
-            case LT_I: push(Value::boolean(x < y)); continue; case LE_I: push(Value::boolean(x <= y)); continue;
-            case GT_I: push(Value::boolean(x > y)); continue; default: push(Value::boolean(x >= y)); continue;
+            case ADD_I: push(Value::integer(wrap(ux + uy))); break;
+            case SUB_I: push(Value::integer(wrap(ux - uy))); break;
+            case MUL_I: push(Value::integer(wrap(ux * uy))); break;
+            case DIV_I: if (y == 0) throw Error("RUN_ERROR", "int division by zero"); push(Value::integer(y == -1 ? wrap(0 - ux) : x / y)); break;  // truncates toward zero; INT64_MIN / -1 wraps
+            case MOD_I: if (y == 0) throw Error("RUN_ERROR", "int modulo by zero"); push(Value::integer(y == -1 ? 0 : x % y)); break;  // remainder with the dividend's sign
+            case LT_I: push(Value::boolean(x < y)); break; case LE_I: push(Value::boolean(x <= y)); break;
+            case GT_I: push(Value::boolean(x > y)); break; default: push(Value::boolean(x >= y)); break;
           }
-          if (r64 > INT32_MAX || r64 < INT32_MIN) throw Error("RUN_ERROR", "int overflow: " + std::to_string(r64) + " does not fit a 32-bit int");
-          push(Value::integer(int32_t(r64))); break;
+          break;
         }
         case ADD_F: case SUB_F: case MUL_F: case DIV_F: case LT_F: case LE_F: case GT_F: case GE_F: {
           Value b = pop(), a = pop();
@@ -307,13 +374,12 @@ class Program {
           }
           break;
         }
-        case NEG_I: { Value a = pop(); if (a.kind != Value::INT) throw Error(std::string("int negation applied to ") + a.kind_name()); if (a.i == INT32_MIN) throw Error("RUN_ERROR", "int overflow: negating the smallest int"); push(Value::integer(-a.i)); break; }
+        case NEG_I: { Value a = pop(); if (a.kind != Value::INT) throw Error(std::string("int negation applied to ") + a.kind_name()); push(Value::integer(wrap(0 - uint64_t(a.i)))); break; }  // INT64_MIN wraps to itself
         case NEG_F: { Value a = pop(); if (a.kind != Value::FLOAT) throw Error(std::string("float negation applied to ") + a.kind_name()); push(Value::real(-a.f)); break; }
         case I2F: { Value a = pop(); if (a.kind != Value::INT) throw Error(std::string("float() applied to ") + a.kind_name()); push(Value::real(double(a.i))); break; }
         case CONCAT: {
           Value b = pop(), a = pop();
           if (a.kind != Value::STR || b.kind != Value::STR) throw Error(std::string("string + applied to ") + a.kind_name() + " and " + b.kind_name());
-          if (a.s.size() + b.s.size() > MAX_STRING_BYTES) throw Error("RUN_ERROR", "string + result exceeds " + std::to_string(MAX_STRING_BYTES) + " bytes");
           push(Value::string(a.s + b.s)); break;
         }
         case I2S: { Value a = pop(); if (a.kind != Value::INT) throw Error(std::string("str(int) applied to ") + a.kind_name()); push(Value::string(std::to_string(a.i))); break; }
@@ -347,51 +413,50 @@ class Program {
 
   size_t constant_count() const { return consts_.size(); }
   size_t code_size() const { return code_.size(); }
+  size_t import_count() const { return imports_.size(); }
+  size_t local_count() const { return locals_.size(); }
+  const std::vector<Local>& locals() const { return locals_; }
+  uint16_t max_stack() const { return max_stack_; }
+  const std::vector<Line>& lines() const { return lines_; }
+  // The source position recorded for a pc (the last line-table entry at or before it); null when the table has none.
+  const Line* line_of(size_t pc) const { const Line* best = nullptr; for (auto& l : lines_) { if (l.pc <= pc) best = &l; else break; } return best; }
 
  private:
-  // Static verification: every instruction decodes, every index is in range, every jump lands on an instruction start,
-  // every referenced name is bound in the registry with the same arity, the code ends with HALT.
-  void verify(const Registry& reg) const {
+  // Static verification: every instruction decodes, every index is in range, every jump lands on an instruction start and
+  // moves forward, the code ends with HALT. Imports and context were already resolved while reading the tables.
+  void verify() const {
     std::vector<size_t> starts; std::vector<std::pair<size_t, int64_t>> jumps;
     Reader r(code_);
-    auto cidx = [&](uint16_t i) -> const std::string& { if (i >= consts_.size()) throw Error("LOAD_BAD_BYTECODE", "constant index " + std::to_string(i) + " out of range (" + std::to_string(consts_.size()) + " constants)"); return consts_[i]; };
+    auto index = [&](size_t i, size_t n, const char* what) { if (i >= n) throw Error("LOAD_BAD_BYTECODE", std::string(what) + " index " + std::to_string(i) + " out of range (" + std::to_string(n) + " entries)"); };
     bool halted = false;
     while (!r.done()) {
       starts.push_back(r.pos());
       uint8_t op = r.u8(); halted = false;
       switch (op) {
-        case PUSH_INT: r.i32(); break;
+        case PUSH_INT: r.i64(); break;
         case PUSH_FLOAT: r.f64(); break;
-        case PUSH_STR: cidx(r.u16()); break;
+        case PUSH_STR: index(r.u32(), consts_.size(), "constant"); break;
         case PUSH_BOOL: {
           uint8_t v = r.u8();
           if (v > 1) throw Error("LOAD_BAD_BYTECODE", "PUSH_BOOL operand must be 0 or 1");
           break;
         }
-        case LOAD_LOCAL: case STORE_LOCAL: {
-          uint16_t s = r.u16();
-          if (s >= nlocals_) throw Error("RUN_ERROR", "local slot " + std::to_string(s) + " out of range (" + std::to_string(nlocals_) + " locals)");
-          break;
-        }
-        case LOAD_CTX: {
-          const std::string& n = cidx(r.u16());
-          if (!reg.context_type(n)) throw Error("LOAD_UNBOUND", "context variable '" + n + "' is not declared by the host");
-          break;
-        }
+        case LOAD_LOCAL: case STORE_LOCAL: index(r.u16(), locals_.size(), "local slot"); break;
+        case LOAD_CTX: index(r.u16(), context_.size(), "context"); break;
         case CALL_FN: {
-          const std::string& n = cidx(r.u16()); uint8_t argc = r.u8(); auto f = reg.find_function(n);
-          if (!f) throw Error("LOAD_UNBOUND", "host function '" + n + "' is not bound");
-          if (f->sig.params.size() != argc) throw Error("LOAD_UNBOUND", "host function '" + n + "' takes " + std::to_string(f->sig.params.size()) + " argument(s), bytecode passes " + std::to_string(argc));
+          uint16_t i = r.u16(); uint8_t argc = r.u8(); index(i, imports_.size(), "import");
+          if (!imports_[i].fn) throw Error("LOAD_BAD_BYTECODE", "CALL_FN at offset " + std::to_string(starts.back()) + " names import " + std::to_string(i) + ", which is a method");
+          if (imports_[i].fn->sig.params.size() != argc) throw Error("LOAD_BAD_BYTECODE", "CALL_FN at offset " + std::to_string(starts.back()) + " passes " + std::to_string(argc) + " argument(s), the import takes " + std::to_string(imports_[i].fn->sig.params.size()));
           break;
         }
         case CALL_METHOD: {
-          const std::string& t = cidx(r.u16()); const std::string& n = cidx(r.u16()); uint8_t argc = r.u8(); auto m = reg.find_method(t, n);
-          if (!m) throw Error("LOAD_UNBOUND", "method '" + t + "." + n + "' is not bound");
-          if (m->sig.params.size() != argc) throw Error("LOAD_UNBOUND", "method '" + t + "." + n + "' takes " + std::to_string(m->sig.params.size()) + " argument(s), bytecode passes " + std::to_string(argc));
+          uint16_t i = r.u16(); uint8_t argc = r.u8(); index(i, imports_.size(), "import");
+          if (!imports_[i].method) throw Error("LOAD_BAD_BYTECODE", "CALL_METHOD at offset " + std::to_string(starts.back()) + " names import " + std::to_string(i) + ", which is a function");
+          if (imports_[i].method->sig.params.size() != argc) throw Error("LOAD_BAD_BYTECODE", "CALL_METHOD at offset " + std::to_string(starts.back()) + " passes " + std::to_string(argc) + " argument(s), the import takes " + std::to_string(imports_[i].method->sig.params.size()));
           break;
         }
         case EQ: case NE: case NOT: case DUP: case POP: break;
-        case ADD_I: case SUB_I: case MUL_I: case DIV_I: case ADD_F: case SUB_F: case MUL_F: case DIV_F: case NEG_I: case NEG_F:
+        case ADD_I: case SUB_I: case MUL_I: case DIV_I: case MOD_I: case ADD_F: case SUB_F: case MUL_F: case DIV_F: case NEG_I: case NEG_F:
         case LT_I: case LE_I: case GT_I: case GE_I: case LT_F: case LE_F: case GT_F: case GE_F: case I2F: case CONCAT: case I2S: case F2S: case B2S: break;
         case JUMP: case JUMP_IF_FALSE: case JUMP_IF_TRUE: {
           int32_t rel = r.i32();
@@ -399,17 +464,17 @@ class Program {
           jumps.emplace_back(r.pos(), int64_t(r.pos()) + rel); break;
         }
         case HALT: halted = true; break;
-        default: throw Error("RUN_ERROR", "unknown opcode " + std::to_string(op) + " at offset " + std::to_string(starts.back()));
+        default: throw Error("LOAD_BAD_BYTECODE", "unknown opcode " + std::to_string(op) + " at offset " + std::to_string(starts.back()));
       }
     }
     if (!halted) throw Error("LOAD_BAD_BYTECODE", "code does not end with HALT");
-    if (nlocals_ > 4096) throw Error("LOAD_BAD_BYTECODE", "too many locals: " + std::to_string(nlocals_) + " (limit 4096)");
     for (auto& j : jumps) {
       bool ok = j.second >= 0 && std::find(starts.begin(), starts.end(), size_t(j.second)) != starts.end();
       if (!ok) throw Error("LOAD_BAD_BYTECODE", "jump at offset " + std::to_string(j.first) + " targets " + std::to_string(j.second) + ", not an instruction start");
     }
+    for (auto& l : lines_) if (l.pc >= code_.size()) throw Error("LOAD_BAD_BYTECODE", "line table entry points at pc " + std::to_string(l.pc) + ", beyond the code");
   }
-  std::vector<std::string> consts_; uint16_t nlocals_ = 0; std::string code_;
+  std::vector<std::string> consts_; std::vector<Import> imports_; std::vector<std::string> context_; std::vector<Local> locals_; uint16_t max_stack_ = 0; std::string code_; std::vector<Line> lines_;
 };
 
 inline std::string read_file(const std::string& path) {
