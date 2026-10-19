@@ -145,3 +145,11 @@ value type in the DSL, per-link callbacks in the mirror (R13 says configure, not
 The pinned v4 SDK includes common math (S4): `lerp`, `ease`, `ease_in`, `ease_out`,
 `sin`, `cos`, `sqrt`, `abs`, `floor`, `pow`, `min`, `max`, `clamp`, and `int(float)`.
 These are compiler built-ins, with exact primitive argument types; no host imports are needed.
+
+## Schema 2 (S2)
+
+The host schema now uses `"dsl.schema": 2` and an array of signatures under every method/function name.
+The matching v4 compiler resolves overloads, declared conversions, arithmetic operators and enums before
+execution; imports bind complete canonical signatures. `returns: "self"` is a schema shorthand for
+the enclosing object type, with no new VM identity or call-time checks. Use the built mono compiler
+with `LMSCRIPT_MIN=0` until a matching release; the released 0.2.328 still emits v3.

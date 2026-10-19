@@ -38,3 +38,9 @@ lerp, ease/ease_in/ease_out, and saturating int(float). These names belong to th
 compiler and need no registry imports. Host behavior/schema is unchanged in this slice.
 The runtime adds no limits or new dynamic checks; integer abs wraps at INT64_MIN.
 Use the matching mono v4 compiler with LMSCRIPT_MIN=0 until a v4 release; see sdk.lock.
+
+## S2 schema and SDK adoption
+
+Schema 2 requires signature arrays. The SDK binds complete canonical imports, allowing multiple
+signatures per name without dynamic overload dispatch. Self is expanded to the receiver type at
+compile/host-schema-read time; the VM adds no identity/type checks or limits. See sdk.lock for pin.

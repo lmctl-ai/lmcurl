@@ -173,7 +173,7 @@ check_rejects 'let r = request().url("http://h/").send();
 out.print(r.json_text(1));' '3:23: _dsl_: method Response.json_text expects string for argument 1; found int' 'json-path-type'
 check_rejects 'let m = mirror().depth("2");' '2:24: _dsl_: method Mirror.depth expects int for argument 1; found string' 'depth-string'
 check_rejects 'let m = mirror().start("http://h/");
-out.print(str(m.run()));' '3:15: _dsl_: built-in str expects int, float or bool; found object MirrorResult' 'str-of-handle'
+out.print(str(m.run()));' '3:15: _dsl_: built-in str expects int, float, bool or enum; found object MirrorResult' 'str-of-handle'
 check_rejects 'let r = request().url("http://h/");
 out.print(r.status());' "3:13: _dsl_: type Request has no method 'status' (methods: method, url, header, body, timeout_ms, max_bytes, max_redirects, send)" 'response-method-on-request'
 check_rejects 'out.print(env());' '2:14: _dsl_: function env expects 1 argument(s) (string); found 0' 'env-arity'

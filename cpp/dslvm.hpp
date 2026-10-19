@@ -8,8 +8,9 @@
 //   dslvm::Value                         tagged value: VOID, INT (int64, two's complement), FLOAT (binary64), STR (UTF-8), BOOL, OBJ (host pointer + schema type name)
 //   dslvm::Args                          std::vector<Value> of call arguments, in order
 //   dslvm::Registry                      the implementation of the schema, declared with its types: function(name, {param types}, return
-//                                        type, fn), method(type, name, {param types}, return type, fn), context(name, type); duplicates are
-//                                        refused; signatures() lists the canonical strings `lmscript --dsl-signatures SCHEMA` prints, so a
+//                                        type, fn), method(type, name, {param types}, return type, fn), context(name, type); entries are
+//                                        keyed by canonical signature, distinct parameter tuples overload a name, and duplicate parameter
+//                                        tuples are refused; signatures() lists the canonical strings `lmscript --dsl-signatures SCHEMA` prints, so a
 //                                        host test diffs registry and schema (spec v4 S0, a consistency check between two sources of truth,
 //                                        not a run-time defense: R33/R34, the VM checks nothing at call time)
 //   dslvm::Context                       the live objects of one run: set(name, pointer)
@@ -136,15 +137,23 @@ struct MethodEntry { Signature sig; Method fn; };
 inline std::string signature_text(const Signature& s) { std::string out = "("; for (size_t i = 0; i < s.params.size(); ++i) out += (i ? ", " : "") + s.params[i]; return out + ") -> " + s.returns; }
 
 class Registry {
+  struct NamedFunction { std::string name; FunctionEntry entry; };
+  struct NamedMethod { std::string type, name; MethodEntry entry; };
  public:
   // Type names are the schema's: int, float, string, bool, void (returns only) or an object type name. The arity the loader
-  // checks is params.size(). Registering a name twice is an error (two implementations of one schema entry).
+  // checks is params.size(). Registering a name with the same parameter tuple twice is an error; distinct tuples are overloads.
   Registry& function(const std::string& name, std::vector<std::string> params, std::string returns, Function fn) {
-    if (!functions_.emplace(name, FunctionEntry{{std::move(params), std::move(returns)}, std::move(fn)}).second) throw Error("LOAD_UNBOUND", "registry: function '" + name + "' is registered twice");
+    Signature sig{std::move(params), std::move(returns)};
+    for (const auto& f : functions_) if (f.second.name == name && f.second.entry.sig.params == sig.params) throw Error("LOAD_UNBOUND", "registry: function '" + name + signature_text(sig) + "' is registered twice");
+    std::string key = "fn " + name + signature_text(sig);
+    functions_.emplace(std::move(key), NamedFunction{name, FunctionEntry{std::move(sig), std::move(fn)}});
     return *this;
   }
   Registry& method(const std::string& type, const std::string& name, std::vector<std::string> params, std::string returns, Method fn) {
-    if (!methods_.emplace(type + "." + name, MethodEntry{{std::move(params), std::move(returns)}, std::move(fn)}).second) throw Error("LOAD_UNBOUND", "registry: method '" + type + "." + name + "' is registered twice");
+    Signature sig{std::move(params), std::move(returns)};
+    for (const auto& m : methods_) if (m.second.type == type && m.second.name == name && m.second.entry.sig.params == sig.params) throw Error("LOAD_UNBOUND", "registry: method '" + type + "." + name + signature_text(sig) + "' is registered twice");
+    std::string key = "method " + type + "." + name + signature_text(sig);
+    methods_.emplace(std::move(key), NamedMethod{type, name, MethodEntry{std::move(sig), std::move(fn)}});
     return *this;
   }
   Registry& context(const std::string& name, const std::string& type) {
@@ -155,27 +164,29 @@ class Registry {
   std::vector<std::string> signatures() const {
     std::vector<std::string> out;
     for (auto& c : context_) out.push_back("context " + c.first + ": " + c.second);
-    for (auto& f : functions_) out.push_back("fn " + f.first + signature_text(f.second.sig));
-    for (auto& m : methods_) out.push_back("method " + m.first + signature_text(m.second.sig));
+    for (auto& f : functions_) out.push_back(f.first);
+    for (auto& m : methods_) out.push_back(m.first);
     std::sort(out.begin(), out.end()); return out;
   }
-  const FunctionEntry* find_function(const std::string& name) const { auto it = functions_.find(name); return it == functions_.end() ? nullptr : &it->second; }
-  const MethodEntry* find_method(const std::string& type, const std::string& name) const { auto it = methods_.find(type + "." + name); return it == methods_.end() ? nullptr : &it->second; }
+  // Name-only lookup is retained for host introspection; overloaded names are intentionally ambiguous.
+  const FunctionEntry* find_function(const std::string& name) const { const FunctionEntry* found = nullptr; for (auto& f : functions_) if (f.second.name == name) { if (found) return nullptr; found = &f.second.entry; } return found; }
+  const MethodEntry* find_method(const std::string& type, const std::string& name) const { const MethodEntry* found = nullptr; for (auto& m : methods_) if (m.second.type == type && m.second.name == name) { if (found) return nullptr; found = &m.second.entry; } return found; }
   const std::string* context_type(const std::string& name) const { auto it = context_.find(name); return it == context_.end() ? nullptr : &it->second; }
   // The entry whose canonical string is `fn NAME(...) -> R`; null when the host declares no such signature (the loader names
   // the host's own signature for that name in its message, so a type drift between schema and host is one line to read).
-  const FunctionEntry* function_by_signature(const std::string& canonical) const { for (auto& f : functions_) if ("fn " + f.first + signature_text(f.second.sig) == canonical) return &f.second; return nullptr; }
-  const MethodEntry* method_by_signature(const std::string& canonical) const { for (auto& m : methods_) if ("method " + m.first + signature_text(m.second.sig) == canonical) return &m.second; return nullptr; }
+  const FunctionEntry* function_by_signature(const std::string& canonical) const { auto it = functions_.find(canonical); return it == functions_.end() ? nullptr : &it->second.entry; }
+  const MethodEntry* method_by_signature(const std::string& canonical) const { auto it = methods_.find(canonical); return it == methods_.end() ? nullptr : &it->second.entry; }
   std::string declared_for(const std::string& canonical) const {  // "the host declares fn x(float) -> int" or "" when the name is unknown
     size_t sp = canonical.find(' '), par = canonical.find('(');
     if (sp == std::string::npos || par == std::string::npos || par < sp) return "";
     std::string name = canonical.substr(sp + 1, par - sp - 1);
-    if (canonical.compare(0, 3, "fn ") == 0) { auto f = functions_.find(name); return f == functions_.end() ? "" : "fn " + name + signature_text(f->second.sig); }
-    auto m = methods_.find(name); return m == methods_.end() ? "" : "method " + name + signature_text(m->second.sig);
+    if (canonical.compare(0, 3, "fn ") == 0) { std::vector<std::string> have; for (auto& f : functions_) if (f.second.name == name) have.push_back(f.first); std::sort(have.begin(), have.end()); std::string out; for (const auto& s : have) out += (out.empty() ? "" : ", ") + s; return out; }
+    auto dot = name.find('.'); if (dot == std::string::npos) return "";
+    std::vector<std::string> have; for (auto& m : methods_) if (m.second.type + "." + m.second.name == name) have.push_back(m.first); std::sort(have.begin(), have.end()); std::string out; for (const auto& s : have) out += (out.empty() ? "" : ", ") + s; return out;
   }
  private:
-  std::map<std::string, FunctionEntry> functions_;
-  std::map<std::string, MethodEntry> methods_;
+  std::map<std::string, NamedFunction> functions_;
+  std::map<std::string, NamedMethod> methods_;
   std::map<std::string, std::string> context_;
 };
 
