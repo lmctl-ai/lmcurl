@@ -2,7 +2,7 @@
 
 What this repo is: the third proof-of-concept host of the lmscript `_dsl_` framework: a curl-like C++ HTTP client where one
 self-contained lmscript file does a POST, an LLM API call (key from the host environment) or a recursive static-site mirror configured
-by the chunk. It forced string concatenation and `str()` (introduced in spec v3; the host now runs bytecode v4). Status (2026-10-18): EXPERIMENTAL, green (`test.sh` 24 checks on
+by the chunk. It forced string concatenation and `str()` (introduced in spec v3; the host ran bytecode v4 in this historical record). Status (2026-10-18): EXPERIMENTAL, green (`test.sh` 24 checks on
 lmscript 0.2.328 and 0.2.330); private repo `lmctlhq/poc-curl`. Operator requirement R22 (and R12, R13, R15, R20).
 
 Team guide: lmctl-mono `lmscript/durable-memory/dsl-framework.md`. Requirements and findings: lmctl-mono
@@ -25,6 +25,11 @@ Collections and domain checks remain host-owned. No loops/math/overloads from la
 passed 25 checks against the built v4 compiler (all builds/tests run sequentially).
 The installed release 0.2.328 emits v3 and is not compatible; no release promotion occurred.
 
+## Current integration target — DSL v5
+
+The host now targets the v5 compiler/runtime. The S1–S4 records above remain historical v4 measurements; the vendored SDK
+pin is refreshed by the integration owner after the v5 runtime is verified.
+
 ## S3 SDK adoption (2026-10-18)
 
 Pinned cpp-dsl-sdk `126b5927dd684044fac0fa17825d6cbeba02b84c`: structured range loops with
@@ -44,3 +49,5 @@ Use the matching mono v4 compiler with LMSCRIPT_MIN=0 until a v4 release; see sd
 Schema 2 requires signature arrays. The SDK binds complete canonical imports, allowing multiple
 signatures per name without dynamic overload dispatch. Self is expanded to the receiver type at
 compile/host-schema-read time; the VM adds no identity/type checks or limits. See sdk.lock for pin.
+
+V5 integration verified with mono compiler and SDK f140fa3: test.sh PASS 25 checks; both runtimes pass the same 42 regenerated vectors. No release promotion.

@@ -47,7 +47,7 @@ ok "mock server listens on $PORT"
 
 # 2. post.lms: one script file does a JSON POST; the echo proves method, headers and the exact body.
 compile examples/post.lms "$WORK/post.dslb" "$BASE/echo" >"$WORK/c.out" 2>&1 || { cat "$WORK/c.out"; fail "compile post.lms"; }
-[ "$(od -An -tu1 -j4 -N2 "$WORK/post.dslb" | tr -s ' ' | sed 's/^ //')" = "0 4" ] || fail "bytecode version 4"
+[ "$(od -An -tu1 -j4 -N2 "$WORK/post.dslb" | tr -s ' ' | sed 's/^ //')" = "0 5" ] || fail "bytecode version 5"
 RAW="$("$HOST" --dsl "$WORK/post.dslb" --schema "$SCHEMA" 2>"$WORK/post.err")"; code=$?
 echo "$RAW" | sed 's/^/    /'
 [ "$code" = 0 ] || { cat "$WORK/post.err"; fail "post host exit $code"; }
@@ -178,7 +178,7 @@ check_rejects 'let r = request().url("http://h/");
 out.print(r.status());' "3:13: _dsl_: type Request has no method 'status' (methods: method, url, header, body, timeout_ms, max_bytes, max_redirects, send)" 'response-method-on-request'
 check_rejects 'out.print(env());' '2:14: _dsl_: function env expects 1 argument(s) (string); found 0' 'env-arity'
 
-# 7. The host refuses a schema mismatch, a truncated file and an older bytecode version.
+# 7. The host refuses a schema mismatch, a truncated file and the older v4 bytecode version.
 sed 's/"name": "curl"/"name": "curl2"/' "$SCHEMA" >"$WORK/other.json"
 printf 'p = _dsl_ schema="%s";\nout.print("x");\nend _dsl_\nsavedsl(p, "%s/other.dslb");\n' "$WORK/other.json" "$WORK" >"$WORK/other.lms"; compile "$WORK/other.lms" >/dev/null 2>&1 || fail "compile other"
 out="$("$HOST" --dsl "$WORK/other.dslb" --schema "$SCHEMA" 2>/dev/null)"; code=$?
@@ -188,7 +188,7 @@ ok "host refuses a schema-hash mismatch before running: one JSON line, phase loa
 head -c 60 "$WORK/post.dslb" >"$WORK/trunc.dslb"; out="$("$HOST" --dsl "$WORK/trunc.dslb" --schema "$SCHEMA" 2>/dev/null)"; [ $? = 3 ] || fail "truncated exit"
 case "$out" in *'"code": "LOAD_BAD_BYTECODE", "message": "bytecode is truncated'*) ;; *) fail "truncated result line: $out";; esac
 ok "host refuses a truncated file (LOAD_BAD_BYTECODE, exit 3)"
-{ printf 'DSLB\000\002'; tail -c +7 "$WORK/post.dslb"; } >"$WORK/v2.dslb"; out="$("$HOST" --dsl "$WORK/v2.dslb" --schema "$SCHEMA" 2>/dev/null)"; [ $? = 3 ] || fail "version exit"
-case "$out" in *'"code": "LOAD_BAD_BYTECODE", "message": "unsupported bytecode version 2 (this runtime reads version 4)"'*) ;; *) fail "version result line: $out";; esac
-ok "host refuses bytecode version 2 (no backward compatibility)"
+{ printf 'DSLB\000\004'; tail -c +7 "$WORK/post.dslb"; } >"$WORK/v4.dslb"; out="$("$HOST" --dsl "$WORK/v4.dslb" --schema "$SCHEMA" 2>/dev/null)"; [ $? = 3 ] || fail "version exit"
+case "$out" in *'"code": "LOAD_BAD_BYTECODE", "message": "unsupported bytecode version 4 (this runtime reads version 5)"'*) ;; *) fail "version result line: $out";; esac
+ok "host refuses bytecode version 4 (no backward compatibility)"
 echo "PASS $pass checks"

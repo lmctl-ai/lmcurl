@@ -1,6 +1,6 @@
 # poc-curl: a curl-like C++ HTTP host driven by the DSL
 
-**S1′ compiler pairing:** this checkout reads bytecode v4 only. Until a v4 compiler is released,
+**S1′ compiler pairing:** this checkout reads bytecode v5 only. Until a v5 compiler is released,
 use `LMSCRIPT_MIN=0 LMSCRIPT_BIN=../lmctl-mono/lmscript/bin/lmscript bash test.sh` with a built
 mono checkout. Released lmscript 0.2.328 emits v3 and is deliberately refused.
 
@@ -88,7 +88,7 @@ chunk).
 | `schema/curl.dsl.json` | the contract: `Request` builder (method, url, header, body, timeout_ms, max_bytes, max_redirects, send), `Response` (status, ok, body, header, has_json, json_text), `Mirror` (start, depth, same_host, allow, out_dir, max_pages, max_bytes, delay_ms, run), `MirrorResult`, `Output` (print, write_file, fail); functions `request`, `mirror`, `env`, `has_env`, `json_escape`; context `out` |
 | `cpp/http.hpp` | HTTP/1.1 client over POSIX sockets: Connection: close, Content-Length and chunked bodies, bounded redirects, timeouts, size limits, URL parsing and RFC 3986-lite resolution, TLS through OpenSSL under `HAVE_OPENSSL` |
 | `cpp/curlhost.cpp` | the host: typed registry (`register_schema`, `--dsl-signatures`), a small JSON parser with dotted-path lookup, the crawler (same-host, content types, safe local paths, loop and depth control), load, run, the JSON result line and exit codes |
-| `cpp/dslvm.hpp` | the shared runtime, vendored from [lmctlhq/cpp-dsl-sdk](https://github.com/lmctlhq/cpp-dsl-sdk) and pinned by `sdk.lock` (commit + sha256; `scripts/sync-sdk.sh` refreshes it from a sibling checkout, `test.sh` fails on drift); bytecode v4 |
+| `cpp/dslvm.hpp` | the shared runtime, vendored from [lmctlhq/cpp-dsl-sdk](https://github.com/lmctlhq/cpp-dsl-sdk) and pinned by `sdk.lock` (commit + sha256; `scripts/sync-sdk.sh` refreshes it from a sibling checkout, `test.sh` fails on drift); bytecode v5 |
 | `tools/mock-server.mjs` | node mock: `/echo`, `/v1/chat/completions`, `/go` (302), `/chunked`, `/big`, `/slow`, a static site with a loop, an off-site link, a 404 link, a depth chain, CSS and a PNG |
 | `examples/post.lms`, `examples/llm.lms`, `examples/mirror.lms` | the three scripts |
 | `test.sh` | end-to-end test (LMSCRIPT_BIN); first check: the vendored header matches `sdk.lock` |
@@ -149,7 +149,7 @@ These are compiler built-ins, with exact primitive argument types; no host impor
 ## Schema 2 (S2)
 
 The host schema now uses `"dsl.schema": 2` and an array of signatures under every method/function name.
-The matching v4 compiler resolves overloads, declared conversions, arithmetic operators and enums before
+The matching v5 compiler resolves overloads, declared conversions, arithmetic operators and enums before
 execution; imports bind complete canonical signatures. `returns: "self"` is a schema shorthand for
 the enclosing object type, with no new VM identity or call-time checks. Use the built mono compiler
 with `LMSCRIPT_MIN=0` until a matching release; the released 0.2.328 still emits v3.

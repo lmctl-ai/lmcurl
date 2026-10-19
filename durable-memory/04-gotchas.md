@@ -1,6 +1,6 @@
 # Gotchas and limits
 
-- **Header pin:** `cpp/dslvm.hpp` must match `sdk.lock` (cpp-dsl-sdk, bytecode v4 since 2026-10-18); refresh with `scripts/sync-sdk.sh`;
+- **Header pin:** `cpp/dslvm.hpp` must match `sdk.lock` (cpp-dsl-sdk, bytecode v5 since 2026-10-18); refresh with `scripts/sync-sdk.sh`;
   `test.sh` fails on drift.
 - **TLS depends on the build machine.** No OpenSSL dev files -> http-only binary; the test prints `TLS via OpenSSL: yes|no`. No live
   TLS request is part of the test; https was compiled but never exercised against a real server here.
