@@ -6,7 +6,8 @@
   literals; the API key read inside the chunk with `env("POC_CURL_KEY")`, so it is in neither the script nor the bytecode; the reply
   extracted by the host with `json_text("choices.0.message.content")`), `examples/mirror.lms` (the chunk configures a host crawler:
   start, depth, same host, allowed content types, output dir, limits; the host crawls).
-- **Fact:** this host forced spec v3 (2026-10-18): string `+` concatenation and `str(int|float|bool)`, from the one line lmscript
+- **Fact:** this host forced string `+` concatenation and `str(int|float|bool)` in spec v3 (2026-10-18); the host now runs the v4
+  bytecode format with those language features retained, from the one line lmscript
   cannot pre-build, `"Bearer " + env(KEY)`. Builder chains needed nothing new (methods returning their own type).
 - **Fact (R20, measured by counting):** POST = 1 host process instead of 1 curl plus shell quoting (or a body file from another
   process); LLM call with extraction = 1 process instead of curl + jq; mirror of 9 pages = 1 process instead of `wget -r` or 9+

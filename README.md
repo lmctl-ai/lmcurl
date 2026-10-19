@@ -1,7 +1,7 @@
 # poc-curl: a curl-like C++ HTTP host driven by the DSL
 
 Status: EXPERIMENTAL proof of concept for the lmscript `_dsl_` framework (lmctl-mono `lmscript/durable-memory/requirements/dsl-bytecode.md`
-R12-R16, R20, R22; living language spec `lmscript/durable-memory/design/dsl-language.md`, bytecode v3). Nothing here is an accepted
+R12-R16, R20, R22; living language spec `lmscript/durable-memory/design/dsl-language.md`, bytecode v4). Nothing here is an accepted
 design. Run on 2026-10-18 with g++ 11, Node 26, OpenSSL 3 and lmscript 0.2.328 / 0.2.330.
 
 **lmscript.** `_dsl_` and `savedsl` are released (EXPERIMENTAL) in npm `@lmctl-ai/lmctl`: `latest` 0.2.328 and `staging` 0.2.330. `npm install -g @lmctl-ai/lmctl` is enough; `test.sh` uses `lmscript` from PATH (>= 0.2.328, checked) or `LMSCRIPT_BIN`.
@@ -83,7 +83,7 @@ chunk).
 | `schema/curl.dsl.json` | the contract: `Request` builder (method, url, header, body, timeout_ms, max_bytes, max_redirects, send), `Response` (status, ok, body, header, has_json, json_text), `Mirror` (start, depth, same_host, allow, out_dir, max_pages, max_bytes, delay_ms, run), `MirrorResult`, `Output` (print, write_file, fail); functions `request`, `mirror`, `env`, `has_env`, `json_escape`; context `out` |
 | `cpp/http.hpp` | HTTP/1.1 client over POSIX sockets: Connection: close, Content-Length and chunked bodies, bounded redirects, timeouts, size limits, URL parsing and RFC 3986-lite resolution, TLS through OpenSSL under `HAVE_OPENSSL` |
 | `cpp/curlhost.cpp` | the host: typed registry (`register_schema`, `--dsl-signatures`), a small JSON parser with dotted-path lookup, the crawler (same-host, content types, safe local paths, loop and depth control), load, run, the JSON result line and exit codes |
-| `cpp/dslvm.hpp` | the shared runtime, vendored from [lmctlhq/cpp-dsl-sdk](https://github.com/lmctlhq/cpp-dsl-sdk) and pinned by `sdk.lock` (commit + sha256; `scripts/sync-sdk.sh` refreshes it from a sibling checkout, `test.sh` fails on drift); bytecode v3 |
+| `cpp/dslvm.hpp` | the shared runtime, vendored from [lmctlhq/cpp-dsl-sdk](https://github.com/lmctlhq/cpp-dsl-sdk) and pinned by `sdk.lock` (commit + sha256; `scripts/sync-sdk.sh` refreshes it from a sibling checkout, `test.sh` fails on drift); bytecode v4 |
 | `tools/mock-server.mjs` | node mock: `/echo`, `/v1/chat/completions`, `/go` (302), `/chunked`, `/big`, `/slow`, a static site with a loop, an off-site link, a 404 link, a depth chain, CSS and a PNG |
 | `examples/post.lms`, `examples/llm.lms`, `examples/mirror.lms` | the three scripts |
 | `test.sh` | end-to-end test (LMSCRIPT_BIN); first check: the vendored header matches `sdk.lock` |

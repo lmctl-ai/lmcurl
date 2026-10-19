@@ -18,7 +18,7 @@ namespace {
 struct Request { std::string method = "GET", url, body; std::vector<std::pair<std::string, std::string>> headers; http::Options opt; };
 struct Response { http::Response r; };
 struct Mirror { std::string start, outDir = "mirror"; int depth = 1, maxPages = 100, delayMs = 0; size_t maxBytes = 4u * 1024u * 1024u; bool sameHost = true; std::vector<std::string> allow; };
-struct MirrorResult { int pages = 0, skipped = 0, failed = 0; long bytes = 0; };
+struct MirrorResult { int pages = 0, skipped = 0, failed = 0; int64_t bytes = 0; };
 struct Output { std::vector<std::string> lines; std::vector<std::string> failures; };  // out.print lines and out.fail messages, reported once at the end
 struct Arena { std::vector<std::unique_ptr<Request>> requests; std::vector<std::unique_ptr<Response>> responses; std::vector<std::unique_ptr<Mirror>> mirrors; std::vector<std::unique_ptr<MirrorResult>> results; };
 
@@ -189,7 +189,7 @@ void register_schema(dslvm::Registry& reg, Arena& arena, Output& output) {
   reg.method("MirrorResult", "pages", {}, "int", [&](void* p, dslvm::Args&) { return dslvm::Value::integer(mr(p)->pages); });
   reg.method("MirrorResult", "skipped", {}, "int", [&](void* p, dslvm::Args&) { return dslvm::Value::integer(mr(p)->skipped); });
   reg.method("MirrorResult", "failed", {}, "int", [&](void* p, dslvm::Args&) { return dslvm::Value::integer(mr(p)->failed); });
-  reg.method("MirrorResult", "bytes", {}, "int", [&](void* p, dslvm::Args&) { return dslvm::Value::integer(int32_t(mr(p)->bytes)); });
+  reg.method("MirrorResult", "bytes", {}, "int", [&](void* p, dslvm::Args&) { return dslvm::Value::integer(mr(p)->bytes); });
   reg.method("Output", "print", {"string"}, "void", [&](void* p, dslvm::Args& a) { static_cast<Output*>(p)->lines.push_back(a[0].s); return dslvm::Value::none(); });
   reg.method("Output", "write_file", {"string", "string"}, "void", [&](void*, dslvm::Args& a) { std::ofstream f(a[0].s, std::ios::binary); if (!f) throw dslvm::Error("Output.write_file: cannot write " + a[0].s); f << a[1].s; return dslvm::Value::none(); });
   reg.method("Output", "fail", {"string"}, "void", [&](void* p, dslvm::Args& a) { std::cerr << "fail: " << a[0].s << "\n"; static_cast<Output*>(p)->failures.push_back(a[0].s); return dslvm::Value::none(); });

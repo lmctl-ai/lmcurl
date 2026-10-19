@@ -47,7 +47,7 @@ ok "mock server listens on $PORT"
 
 # 2. post.lms: one script file does a JSON POST; the echo proves method, headers and the exact body.
 compile examples/post.lms "$WORK/post.dslb" "$BASE/echo" >"$WORK/c.out" 2>&1 || { cat "$WORK/c.out"; fail "compile post.lms"; }
-[ "$(od -An -tu1 -j4 -N2 "$WORK/post.dslb" | tr -s ' ' | sed 's/^ //')" = "0 3" ] || fail "bytecode version 3"
+[ "$(od -An -tu1 -j4 -N2 "$WORK/post.dslb" | tr -s ' ' | sed 's/^ //')" = "0 4" ] || fail "bytecode version 4"
 RAW="$("$HOST" --dsl "$WORK/post.dslb" --schema "$SCHEMA" 2>"$WORK/post.err")"; code=$?
 echo "$RAW" | sed 's/^/    /'
 [ "$code" = 0 ] || { cat "$WORK/post.err"; fail "post host exit $code"; }
@@ -189,6 +189,6 @@ head -c 60 "$WORK/post.dslb" >"$WORK/trunc.dslb"; out="$("$HOST" --dsl "$WORK/tr
 case "$out" in *'"code": "LOAD_BAD_BYTECODE", "message": "bytecode is truncated'*) ;; *) fail "truncated result line: $out";; esac
 ok "host refuses a truncated file (LOAD_BAD_BYTECODE, exit 3)"
 { printf 'DSLB\000\002'; tail -c +7 "$WORK/post.dslb"; } >"$WORK/v2.dslb"; out="$("$HOST" --dsl "$WORK/v2.dslb" --schema "$SCHEMA" 2>/dev/null)"; [ $? = 3 ] || fail "version exit"
-case "$out" in *'"code": "LOAD_BAD_BYTECODE", "message": "unsupported bytecode version 2 (this runtime reads version 3)"'*) ;; *) fail "version result line: $out";; esac
+case "$out" in *'"code": "LOAD_BAD_BYTECODE", "message": "unsupported bytecode version 2 (this runtime reads version 4)"'*) ;; *) fail "version result line: $out";; esac
 ok "host refuses bytecode version 2 (no backward compatibility)"
 echo "PASS $pass checks"
