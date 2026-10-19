@@ -30,6 +30,9 @@ The installed release 0.2.328 emits v3 and is not compatible; no release promoti
 The host now targets the v5 compiler/runtime. The S1–S4 records above remain historical v4 measurements; the vendored SDK
 pin is refreshed by the integration owner after the v5 runtime is verified.
 
+S5 host coverage is verified: the test will run a computed division-by-zero and assert the JSON line/column location. Final
+v5 runtime verification is pending.
+
 ## S3 SDK adoption (2026-10-18)
 
 Pinned cpp-dsl-sdk `126b5927dd684044fac0fa17825d6cbeba02b84c`: structured range loops with
@@ -53,3 +56,5 @@ compile/host-schema-read time; the VM adds no identity/type checks or limits. Se
 V5 integration verified with mono compiler and SDK f140fa3: test.sh PASS 25 checks; both runtimes pass the same 42 regenerated vectors. No release promotion.
 
 Final v5 verifier refresh: SDK b8fd285, PASS 25 checks; both runtimes pass all 43 regenerated vectors. This supersedes the earlier f140fa3 integration pin.
+
+S5 verified with SDK a0bebcd: PASS 27 checks. Exact physical line/column assertions cover existing host failures and computed division by zero; both SDKs pass all 50 shared vectors. Existing result codes and host checks are retained. No release promotion.

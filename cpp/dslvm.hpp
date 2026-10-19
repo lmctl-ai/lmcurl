@@ -64,8 +64,15 @@ namespace dslvm {
 
 struct Error : std::runtime_error {
   std::string code;
-  explicit Error(const std::string& m) : std::runtime_error(m), code("RUN_HOST") {}   // a plain message is what host closures throw
-  Error(const std::string& c, const std::string& m) : std::runtime_error(m), code(c) {}
+  std::string message;
+  bool has_location = false;
+  bool has_column = false;
+  uint32_t line = 0;
+  uint16_t column = 0;
+  explicit Error(const std::string& m) : std::runtime_error(m), code("RUN_HOST"), message(m) {}   // a plain message is what host closures throw
+  Error(const std::string& c, const std::string& m) : std::runtime_error(m), code(c), message(m) {}
+  const char* what() const noexcept override { return message.c_str(); }
+  void locate(uint32_t l, uint16_t c) { if (has_location || l == 0) return; has_location = true; has_column = c != 0; line = l; column = c; message = "dsl line " + std::to_string(l) + (has_column ? ":" + std::to_string(c) : "") + ": " + message; }
 };
 
 // ---- SHA-256 (FIPS 180-4), used only to bind the bytecode to the exact schema bytes ----
@@ -201,7 +208,9 @@ inline std::string json_escape(const std::string& s) {
 inline int report_ok(const std::string& result_json = "null") { std::cout << "{\"ok\": true, \"result\": " << result_json << "}" << std::endl; return 0; }
 // phase is "load" or "run" (compile failures are lmscript's, exit 2); exit 4 for APP_FAIL, else 3.
 inline int report_error(const std::string& phase, const Error& e) {
-  std::cout << "{\"ok\": false, \"phase\": " << json_escape(phase) << ", \"code\": " << json_escape(e.code) << ", \"message\": " << json_escape(e.what()) << "}" << std::endl;
+  std::cout << "{\"ok\": false, \"phase\": " << json_escape(phase) << ", \"code\": " << json_escape(e.code) << ", \"message\": " << json_escape(e.what());
+  if (e.has_location) { std::cout << ", \"line\": " << e.line; if (e.has_column) std::cout << ", \"column\": " << e.column; }
+  std::cout << "}" << std::endl;
   return e.code == "APP_FAIL" ? 4 : 3;
 }
 inline int report_app_failure(const std::string& message) { return report_error("app", Error("APP_FAIL", message)); }
@@ -359,9 +368,11 @@ class Program {
       return static_cast<int64_t>(x);
     };
     while (true) {
-      uint8_t op = r.u8();
-      if (stats) ++stats->instructions;
-      switch (op) {
+      const size_t fault_pc = r.pos();
+      try {
+        uint8_t op = r.u8();
+        if (stats) ++stats->instructions;
+        switch (op) {
         case PUSH_INT: push(Value::integer(r.i64())); break;
         case PUSH_FLOAT: push(Value::real(r.f64())); break;
         case PUSH_STR: push(Value::string(consts_[r.u32()])); break;
@@ -512,6 +523,11 @@ class Program {
         case POP: pop(); break;
         case HALT: return;
         default: throw Error("RUN_ERROR", "unknown opcode " + std::to_string(op));
+        }
+      } catch (Error& e) {
+        const Line* line = line_of(fault_pc);
+        if (line) e.locate(line->line, line->column);
+        throw;
       }
     }
   }

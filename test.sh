@@ -147,13 +147,25 @@ ok "client: chunked body reassembled, 302 followed (and not followed with max_re
 printf 'p = _dsl_ schema="%s";\nlet d = request().url("%s/big").max_bytes(1000).send();\nend _dsl_\nsavedsl(p, "%s/big.dslb");\n' "$SCHEMA" "$BASE" "$WORK" >"$WORK/big.lms"; compile "$WORK/big.lms" >/dev/null 2>&1 || fail "compile big"
 RAW="$("$HOST" --dsl "$WORK/big.dslb" --schema "$SCHEMA" 2>"$WORK/big.err")"; code=$?
 [ "$code" = 3 ] && grep -q 'response of 1000000 bytes exceeds the size limit of 1000' "$WORK/big.err" || fail "size limit: $code $(cat "$WORK/big.err")"
-case "$RAW" in '{"ok": false, "phase": "run", "code": "RUN_HOST", "message": "Request.send GET '*'response of 1000000 bytes exceeds the size limit of 1000"}') ;; *) fail "size limit result line: $RAW";; esac
-ok "client: size limit refuses a 1 MB body before reading it (phase run, RUN_HOST, exit 3)"
+python3 - "$RAW" <<'PY'
+import json, sys
+d = json.loads(sys.argv[1])
+assert d["phase"] == "run" and d["code"] == "RUN_HOST", d
+assert d["line"] == 2 and d["column"] == 69, d
+assert d["message"].startswith("dsl line 2:69: Request.send GET ") and d["message"].endswith("response of 1000000 bytes exceeds the size limit of 1000"), d
+PY
+ok "client: size limit refuses a 1 MB body and reports DSL line 2:69"
 printf 'p = _dsl_ schema="%s";\nlet s = request().url("%s/slow").timeout_ms(300).send();\nend _dsl_\nsavedsl(p, "%s/slow.dslb");\n' "$SCHEMA" "$BASE" "$WORK" >"$WORK/slow.lms"; compile "$WORK/slow.lms" >/dev/null 2>&1 || fail "compile slow"
 RAW="$("$HOST" --dsl "$WORK/slow.dslb" --schema "$SCHEMA" 2>"$WORK/slow.err")"; code=$?
 [ "$code" = 3 ] && grep -q 'receive failed or timed out' "$WORK/slow.err" || fail "timeout: $code $(cat "$WORK/slow.err")"
-case "$RAW" in '{"ok": false, "phase": "run", "code": "RUN_HOST", "message": "Request.send GET '*'receive failed or timed out'*) ;; *) fail "timeout result line: $RAW";; esac
-ok "client: timeout_ms(300) aborts a 3 s response (exit 3)"
+python3 - "$RAW" <<'PY'
+import json, sys
+d = json.loads(sys.argv[1])
+assert d["phase"] == "run" and d["code"] == "RUN_HOST", d
+assert d["line"] == 2 and d["column"] > 0, d
+assert d["message"].startswith("dsl line 2:") and "Request.send GET " in d["message"] and d["message"].endswith("receive failed or timed out"), d
+PY
+ok "client: timeout_ms(300) aborts a 3 s response and preserves the DSL location"
 
 # 6. Ill-typed chunks are refused at lmscript check time with located errors, before anything runs.
 check_rejects() { # $1 body, $2 expected "LINE:COL: message", $3 label
@@ -191,4 +203,32 @@ ok "host refuses a truncated file (LOAD_BAD_BYTECODE, exit 3)"
 { printf 'DSLB\000\004'; tail -c +7 "$WORK/post.dslb"; } >"$WORK/v4.dslb"; out="$("$HOST" --dsl "$WORK/v4.dslb" --schema "$SCHEMA" 2>/dev/null)"; [ $? = 3 ] || fail "version exit"
 case "$out" in *'"code": "LOAD_BAD_BYTECODE", "message": "unsupported bytecode version 4 (this runtime reads version 5)"'*) ;; *) fail "version result line: $out";; esac
 ok "host refuses bytecode version 4 (no backward compatibility)"
+
+# 8. VM failures retain the DSL source location; the computed zero bypasses the compiler's literal-zero rejection.
+printf 'p = _dsl_ schema="%s";\nlet z = 1 - 1;\nlet x = 1 / z;\nend _dsl_\nsavedsl(p, "%s/located.dslb");\n' "$SCHEMA" "$WORK" >"$WORK/located.lms"
+compile "$WORK/located.lms" >/dev/null 2>&1 || fail "compile located division"
+out="$("$HOST" --dsl "$WORK/located.dslb" --schema "$SCHEMA" 2>"$WORK/located.err")"; code=$?
+[ "$code" = 3 ] || fail "located division exit $code: $out"
+python3 - "$out" <<'PY'
+import json, sys
+d = json.loads(sys.argv[1])
+assert d["phase"] == "run" and d["code"] == "RUN_ERROR", d
+assert d["line"] == 3 and d["column"] == 11, d
+assert d["message"] == "dsl line 3:11: int division by zero", d
+PY
+ok "computed division by zero reports DSL line 3:11"
+
+# A host method failure also carries its source location.
+printf 'p = _dsl_ schema="%s";\nlet r = request().method("BOGUS");\nend _dsl_\nsavedsl(p, "%s/host-error.dslb");\n' "$SCHEMA" "$WORK" >"$WORK/host-error.lms"
+compile "$WORK/host-error.lms" >/dev/null 2>&1 || fail "compile host error"
+out="$("$HOST" --dsl "$WORK/host-error.dslb" --schema "$SCHEMA" 2>"$WORK/host-error.err")"; code=$?
+[ "$code" = 3 ] || fail "host error exit $code: $out"
+python3 - "$out" <<'PY'
+import json, sys
+d = json.loads(sys.argv[1])
+assert d["phase"] == "run" and d["code"] == "RUN_HOST", d
+assert d["line"] == 2 and d["column"] == 19, d
+assert d["message"].startswith("dsl line 2:19:") and "unsupported method" in d["message"], d
+PY
+ok "host method failure reports DSL line 2:19"
 echo "PASS $pass checks"
