@@ -18,6 +18,7 @@
 //                                        the Program is destroyed.
 //   dslvm::Program::run(context, registry)         executes the chunk once; pass the same unchanged Registry used by load()
 //                                        (the argument remains in the public host API); throws dslvm::Error on a run-time failure
+//   dslvm::Program::RunStats             optional dispatch count for host measurements; pass a pointer to run(), never a limit
 //   dslvm::report_ok / report_error / report_app_failure   the standard one-line JSON result on stdout (spec v4 D7, R26) and the
 //                                        exit-code convention 2 compile (lmscript) / 3 host (load or run) / 4 application
 //   dslvm::VERSION                       the bytecode format version this SDK reads (and nothing else: no backward compatibility)
@@ -30,13 +31,14 @@
 // constant, u8 hidden flag); u16 max_stack (the compiler's measured operand-stack depth: the VM reserves it, nothing is checked
 // against it); code: u32 length + code ending with HALT; lines: u32 count, each (u32 pc, u32 line, u16 column), may be empty.
 // Opcodes: enum Op below (PUSH_INT carries an i64, PUSH_STR a u32 constant index, LOAD_CTX a u16 context index, CALL_FN and
-// CALL_METHOD a u16 import index + u8 argc). Int arithmetic is 64-bit two's complement with wraparound (no overflow trap, R34);
+// CALL_METHOD a u16 import index + u8 argc). FOR_RANGE carries counter/end local slots and an exit displacement; FOR_NEXT carries
+// the hidden end slot and a back displacement. Int arithmetic is 64-bit two's complement with wraparound (no overflow trap, R34);
 // division and remainder by zero are run-time errors. The living specification is lmctl-mono
 // lmscript/durable-memory/design/dsl-language.md; the compiler is lmscript's dsl.ts.
 //
 // Guarantees of load(): wrong magic, other version (including v3), schema-hash mismatch, truncation, trailing bytes, unknown
 // constant tags, undecodable instructions, out-of-range constants/locals/imports/context indices, jumps that do not land on an
-// instruction start or go backwards (so every program terminates: the language has no loops), missing HALT, context declarations
+// instruction start or go backwards except for paired structured range loops, missing HALT, context declarations
 // and import signatures the registry does not provide are all refused with a message. The language and the VM impose no
 // memory or time limits (operator decision, 2026-10-18): there is no stack cap, no locals cap and no string-size cap.
 #pragma once
@@ -212,7 +214,8 @@ enum Op : uint8_t {
   // v3: string concatenation and str() conversions
   CONCAT = 0x26, I2S = 0x27, F2S = 0x28, B2S = 0x29,
   // v4 (spec S1'): integer remainder (the dividend's sign; zero divisor is a run-time error).
-  MOD_I = 0x33
+  MOD_I = 0x33,
+  FOR_RANGE = 0x2f, FOR_NEXT = 0x31
 };
 static const char MAGIC[4] = {'D', 'S', 'L', 'B'};
 static const uint16_t VERSION = 4;
@@ -244,6 +247,8 @@ class Program {
   struct Import { const FunctionEntry* fn = nullptr; const MethodEntry* method = nullptr; std::string type, name; };
   struct Local { std::string type; bool hidden = false; };
   struct Line { uint32_t pc, line; uint16_t column; };
+  struct RunStats { uint64_t instructions = 0; };
+  struct Loop { uint16_t counter, end; size_t opener_next; };
 
   // Parses, binds and verifies. Nothing executes here. Throws dslvm::Error with a message naming the problem.
   static Program load(const std::string& bytecode, const std::string& schemaBytes, const Registry& reg) {
@@ -299,7 +304,7 @@ class Program {
   }
 
   // Executes the chunk once. The host's objects come from ctx (declared names only).
-  void run(const Context& ctx, const Registry& reg) const {
+  void run(const Context& ctx, const Registry& reg, RunStats* stats = nullptr) const {
     std::vector<Value> stack, locals(locals_.size());
     stack.reserve(max_stack_);
     Reader r(code_);
@@ -309,6 +314,7 @@ class Program {
     auto wrap = [](uint64_t u) { return from_twos_complement(u); };  // two's complement wraparound through unsigned arithmetic
     while (true) {
       uint8_t op = r.u8();
+      if (stats) ++stats->instructions;
       switch (op) {
         case PUSH_INT: push(Value::integer(r.i64())); break;
         case PUSH_FLOAT: push(Value::real(r.f64())); break;
@@ -400,6 +406,25 @@ class Program {
           if (c.b == (op == JUMP_IF_TRUE)) jump(rel);
           break;
         }
+        case FOR_RANGE: {
+          uint16_t counter = r.u16(), end = r.u16(); int32_t rel = r.i32();
+          Value finish = pop(), begin = pop();
+          locals[end] = std::move(finish);
+          locals[counter] = std::move(begin);
+          if (locals[counter].i >= locals[end].i) jump(rel);
+          break;
+        }
+        case FOR_NEXT: {
+          uint16_t encoded_end = r.u16(); int32_t rel = r.i32();
+          const auto it = loops_.find(r.pos() - 7);
+          // The verifier has paired this instruction and recorded both hidden slots;
+          // the encoded slot is retained as a structural consistency marker.
+          const Loop& loop = it->second;
+          (void)encoded_end;
+          locals[loop.counter].i = from_twos_complement(uint64_t(locals[loop.counter].i) + 1);
+          if (locals[loop.counter].i < locals[loop.end].i) jump(rel);
+          break;
+        }
         case DUP: {
           if (stack.empty()) throw Error("RUN_ERROR", "stack underflow");
           push(stack.back()); break;
@@ -422,16 +447,28 @@ class Program {
   const Line* line_of(size_t pc) const { const Line* best = nullptr; for (auto& l : lines_) { if (l.pc <= pc) best = &l; else break; } return best; }
 
  private:
-  // Static verification: every instruction decodes, every index is in range, every jump lands on an instruction start and
-  // moves forward, the code ends with HALT. Imports and context were already resolved while reading the tables.
-  void verify() const {
-    std::vector<size_t> starts; std::vector<std::pair<size_t, int64_t>> jumps;
+  // Static verification: every instruction decodes, every index is in range, every ordinary jump remains in its lexical
+  // region and moves forward, and range loops are properly paired/nested. Imports and context were already resolved above.
+  void verify() {
+    struct Instr { size_t pc, next, target = 0; uint8_t op; size_t depth; size_t owner; };
+    struct Open { size_t pc, next, exit; uint16_t counter, end; };
+    std::vector<Instr> insns; std::vector<Open> open; std::vector<std::pair<size_t, int64_t>> ordinary;
+    std::vector<uint16_t> used_loop_slots;
+    loops_.clear();
     Reader r(code_);
     auto index = [&](size_t i, size_t n, const char* what) { if (i >= n) throw Error("LOAD_BAD_BYTECODE", std::string(what) + " index " + std::to_string(i) + " out of range (" + std::to_string(n) + " entries)"); };
+    auto local_int_hidden = [&](uint16_t slot, const char* role) {
+      index(slot, locals_.size(), role);
+      if (locals_[slot].type != "int" || !locals_[slot].hidden) throw Error("LOAD_BAD_BYTECODE", std::string(role) + " slot " + std::to_string(slot) + " must be a hidden int local");
+    };
     bool halted = false;
     while (!r.done()) {
-      starts.push_back(r.pos());
-      uint8_t op = r.u8(); halted = false;
+      const size_t pc = r.pos();
+      const size_t depth = open.size();
+      const size_t owner = open.empty() ? size_t(-1) : open.back().pc;
+      const uint8_t op = r.u8();
+      insns.push_back({pc, 0, 0, op, depth, owner});
+      halted = false;
       switch (op) {
         case PUSH_INT: r.i64(); break;
         case PUSH_FLOAT: r.f64(); break;
@@ -445,14 +482,14 @@ class Program {
         case LOAD_CTX: index(r.u16(), context_.size(), "context"); break;
         case CALL_FN: {
           uint16_t i = r.u16(); uint8_t argc = r.u8(); index(i, imports_.size(), "import");
-          if (!imports_[i].fn) throw Error("LOAD_BAD_BYTECODE", "CALL_FN at offset " + std::to_string(starts.back()) + " names import " + std::to_string(i) + ", which is a method");
-          if (imports_[i].fn->sig.params.size() != argc) throw Error("LOAD_BAD_BYTECODE", "CALL_FN at offset " + std::to_string(starts.back()) + " passes " + std::to_string(argc) + " argument(s), the import takes " + std::to_string(imports_[i].fn->sig.params.size()));
+          if (!imports_[i].fn) throw Error("LOAD_BAD_BYTECODE", "CALL_FN at offset " + std::to_string(pc) + " names import " + std::to_string(i) + ", which is a method");
+          if (imports_[i].fn->sig.params.size() != argc) throw Error("LOAD_BAD_BYTECODE", "CALL_FN at offset " + std::to_string(pc) + " passes " + std::to_string(argc) + " argument(s), the import takes " + std::to_string(imports_[i].fn->sig.params.size()));
           break;
         }
         case CALL_METHOD: {
           uint16_t i = r.u16(); uint8_t argc = r.u8(); index(i, imports_.size(), "import");
-          if (!imports_[i].method) throw Error("LOAD_BAD_BYTECODE", "CALL_METHOD at offset " + std::to_string(starts.back()) + " names import " + std::to_string(i) + ", which is a function");
-          if (imports_[i].method->sig.params.size() != argc) throw Error("LOAD_BAD_BYTECODE", "CALL_METHOD at offset " + std::to_string(starts.back()) + " passes " + std::to_string(argc) + " argument(s), the import takes " + std::to_string(imports_[i].method->sig.params.size()));
+          if (!imports_[i].method) throw Error("LOAD_BAD_BYTECODE", "CALL_METHOD at offset " + std::to_string(pc) + " names import " + std::to_string(i) + ", which is a function");
+          if (imports_[i].method->sig.params.size() != argc) throw Error("LOAD_BAD_BYTECODE", "CALL_METHOD at offset " + std::to_string(pc) + " passes " + std::to_string(argc) + " argument(s), the import takes " + std::to_string(imports_[i].method->sig.params.size()));
           break;
         }
         case EQ: case NE: case NOT: case DUP: case POP: break;
@@ -460,21 +497,60 @@ class Program {
         case LT_I: case LE_I: case GT_I: case GE_I: case LT_F: case LE_F: case GT_F: case GE_F: case I2F: case CONCAT: case I2S: case F2S: case B2S: break;
         case JUMP: case JUMP_IF_FALSE: case JUMP_IF_TRUE: {
           int32_t rel = r.i32();
-          if (rel < 0) throw Error("LOAD_BAD_BYTECODE", "jump at offset " + std::to_string(starts.back()) + " goes backwards (the language has no loops; every jump must move forward)");
-          jumps.emplace_back(r.pos(), int64_t(r.pos()) + rel); break;
+          if (rel < 0) throw Error("LOAD_BAD_BYTECODE", "jump at offset " + std::to_string(pc) + " goes backwards (only FOR_NEXT may jump backward)");
+          ordinary.emplace_back(pc, int64_t(r.pos()) + rel); break;
         }
-        case HALT: halted = true; break;
-        default: throw Error("LOAD_BAD_BYTECODE", "unknown opcode " + std::to_string(op) + " at offset " + std::to_string(starts.back()));
+        case FOR_RANGE: {
+          uint16_t counter = r.u16(), end = r.u16(); int32_t rel = r.i32();
+          local_int_hidden(counter, "FOR_RANGE counter"); local_int_hidden(end, "FOR_RANGE end");
+          if (counter == end) throw Error("LOAD_BAD_BYTECODE", "FOR_RANGE counter and end slots must be distinct");
+          for (uint16_t used : used_loop_slots) {
+            if (counter == used || end == used) throw Error("LOAD_BAD_BYTECODE", "FOR_RANGE slot " + std::to_string(counter == used ? counter : end) + " is already owned by another range loop");
+          }
+          used_loop_slots.push_back(counter); used_loop_slots.push_back(end);
+          if (rel < 0) throw Error("LOAD_BAD_BYTECODE", "FOR_RANGE at offset " + std::to_string(pc) + " exits backwards");
+          open.push_back({pc, r.pos(), size_t(int64_t(r.pos()) + rel), counter, end});
+          break;
+        }
+        case FOR_NEXT: {
+          uint16_t encoded_end = r.u16(); int32_t rel = r.i32();
+          if (open.empty()) throw Error("LOAD_BAD_BYTECODE", "FOR_NEXT at offset " + std::to_string(pc) + " has no matching FOR_RANGE");
+          Open loop = open.back(); open.pop_back();
+          if (encoded_end != loop.end) throw Error("LOAD_BAD_BYTECODE", "FOR_NEXT at offset " + std::to_string(pc) + " names end slot " + std::to_string(encoded_end) + ", expected " + std::to_string(loop.end));
+          if (int64_t(r.pos()) + rel != int64_t(loop.next)) throw Error("LOAD_BAD_BYTECODE", "FOR_NEXT at offset " + std::to_string(pc) + " must return to its FOR_RANGE body");
+          if (loop.exit != r.pos()) throw Error("LOAD_BAD_BYTECODE", "FOR_RANGE at offset " + std::to_string(loop.pc) + " must exit immediately after its FOR_NEXT");
+          loops_[pc] = Loop{loop.counter, loop.end, loop.next};
+          break;
+        }
+        case HALT: if (depth != 0) throw Error("LOAD_BAD_BYTECODE", "HALT inside range loop"); halted = true; break;
+        default: throw Error("LOAD_BAD_BYTECODE", "unknown opcode " + std::to_string(op) + " at offset " + std::to_string(pc));
       }
+      insns.back().next = r.pos();
     }
+    if (!open.empty()) throw Error("LOAD_BAD_BYTECODE", "unclosed FOR_RANGE at offset " + std::to_string(open.back().pc));
     if (!halted) throw Error("LOAD_BAD_BYTECODE", "code does not end with HALT");
-    for (auto& j : jumps) {
-      bool ok = j.second >= 0 && std::find(starts.begin(), starts.end(), size_t(j.second)) != starts.end();
-      if (!ok) throw Error("LOAD_BAD_BYTECODE", "jump at offset " + std::to_string(j.first) + " targets " + std::to_string(j.second) + ", not an instruction start");
+    auto find_insn = [&](int64_t target) -> const Instr* { for (auto& i : insns) if (int64_t(i.pc) == target) return &i; return nullptr; };
+    for (auto& j : ordinary) {
+      const Instr* from = find_insn(int64_t(j.first)); const Instr* to = find_insn(j.second);
+      if (!to) throw Error("LOAD_BAD_BYTECODE", "jump at offset " + std::to_string(j.first) + " targets " + std::to_string(j.second) + ", not an instruction start");
+      if (!from || from->owner != to->owner) throw Error("LOAD_BAD_BYTECODE", "jump at offset " + std::to_string(j.first) + " crosses a range-loop boundary");
+    }
+    for (auto& i : insns) if (i.op == STORE_LOCAL) {
+      Reader q(code_); q.seek(i.pc + 1); uint16_t slot = q.u16();
+      for (auto& l : loops_) if (slot == l.second.counter || slot == l.second.end)
+        throw Error("LOAD_BAD_BYTECODE", "STORE_LOCAL at offset " + std::to_string(i.pc) + " writes a read-only range slot " + std::to_string(slot));
+    }
+    for (auto& i : insns) if (i.op == FOR_RANGE) {
+      uint16_t counter = uint16_t(uint8_t(code_[i.pc + 1]) << 8 | uint8_t(code_[i.pc + 2]));
+      (void)counter;
+      // Re-read the encoded exit displacement; its target must be a parent-region instruction.
+      Reader q(code_); q.seek(i.pc + 1); q.u16(); q.u16(); int32_t rel = q.i32();
+      const Instr* to = find_insn(int64_t(q.pos()) + rel);
+      if (!to || to->owner != i.owner) throw Error("LOAD_BAD_BYTECODE", "FOR_RANGE at offset " + std::to_string(i.pc) + " exits to an invalid loop region");
     }
     for (auto& l : lines_) if (l.pc >= code_.size()) throw Error("LOAD_BAD_BYTECODE", "line table entry points at pc " + std::to_string(l.pc) + ", beyond the code");
   }
-  std::vector<std::string> consts_; std::vector<Import> imports_; std::vector<std::string> context_; std::vector<Local> locals_; uint16_t max_stack_ = 0; std::string code_; std::vector<Line> lines_;
+  std::vector<std::string> consts_; std::vector<Import> imports_; std::vector<std::string> context_; std::vector<Local> locals_; uint16_t max_stack_ = 0; std::string code_; std::vector<Line> lines_; std::map<size_t, Loop> loops_;
 };
 
 inline std::string read_file(const std::string& path) {
