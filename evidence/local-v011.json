@@ -1,0 +1,33 @@
+{
+  "version": "lmcurl 0.1.1",
+  "compiler": "lmscript 0.2.420",
+  "local_gate_passed": true,
+  "dsl_programs": 5,
+  "native_scenarios": 29,
+  "mock_serve_lifecycle_passed": true,
+  "concurrent_and_default_memory_budget_passed": true,
+  "schema_signature_lines": 258,
+  "examples_executed_from_empty_directories": 48,
+  "new_downloader_parser_examples": [
+    "web_link_checker",
+    "web_sitemap_crawler",
+    "web_feed_reader",
+    "web_table_scraper",
+    "web_price_watcher",
+    "web_login_form",
+    "web_pagination",
+    "web_site_mirror",
+    "web_seo_audit",
+    "web_image_redirect_audit",
+    "web_api_html_consistency",
+    "web_content_diff",
+    "web_accessibility_scan",
+    "web_metadata_extractor",
+    "web_form_inventory",
+    "web_robots_crawler"
+  ],
+  "new_request_ledgers_validated": true,
+  "new_workload_estimated_cost_usd": 0,
+  "known_credential_values_found": false,
+  "desktop_native_transport_supported": false
+}

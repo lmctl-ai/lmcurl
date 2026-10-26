@@ -273,7 +273,7 @@ Response Session::perform(const Request &input) const {
     set(CURLOPT_HEADERFUNCTION, header_cb);
     set(CURLOPT_HEADERDATA, &t);
     set(CURLOPT_MAXFILESIZE_LARGE, static_cast<curl_off_t>(request.max_bytes));
-    if (!request.proxy.empty())
+    if (request.proxy_set || !request.proxy.empty())
       set(CURLOPT_PROXY, request.proxy.c_str());
     if (!request.cacert.empty())
       set(CURLOPT_CAINFO, request.cacert.c_str());
@@ -547,9 +547,10 @@ void register_http(dslvm::Registry &r, Runtime &rt) {
           q.headers["content-type"] = "application/json";
         }
         q.body = a[0].s;
-      } else if (n == "proxy")
+      } else if (n == "proxy") {
         q.proxy = a[0].s;
-      else if (n == "cacert")
+        q.proxy_set = true;
+      } else if (n == "cacert")
         q.cacert = a[0].s;
       else
         q.resolve = a[0].s;

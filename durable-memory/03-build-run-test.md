@@ -1,7 +1,9 @@
 # Build and verification
 
-`bash test.sh` verifies pinned SDK/dependencies, builds the native host, checks exact version/schema/notices/signatures, audits Linux linkage, compiles and runs four DSL test programs (including the tool-stream path), runs 28 native regression scenarios, regenerates 32 examples and images where sibling renderers are available, checks secret-looking artifacts, and exercises the default memory budget under a 6 GiB virtual-memory ceiling.
+`BUILD_DIR=build LMCURL_TEST_NETWORK=1 bash test.sh` is the local release gate. It verifies SDK/dependency pins, builds, checks version/schema/signatures/notices and dynamic-glibc linkage, runs five DSL programs (including tool-stream and lmhtml integration), 29 native cases, the concurrent memory regression and the Mock.serve subprocess lifecycle test. The default 4096 MiB limit is also exercised under a 6 GiB virtual-memory ceiling.
 
-The local gate is authoritative for this initial release. Linux x86_64 is tested directly. macOS and Windows currently return explicit unsupported stubs. No live credentials are required by the gate.
+The full rendering gate executes all 48 examples from separate empty directories, checks 900x560 PNGs at most 300 KiB, and validates the 16 new zero-cost request ledgers. Without renderers/network opt-in, image execution skips loudly and committed image bytes are checked. No live provider credentials are needed.
 
-A clean Linux build (including out-of-source OpenSSL and configure-time static zlib) passed the same full gate. `make test` uses the same Ninja generator as test.sh. `scripts/test-autorun.py` verifies all public raw URLs with one fresh tool cache and separate empty working directories; it requires a published release and records sanitized evidence.
+CMake uses out-of-source static OpenSSL, a configure-time imported static zlib archive, and the same Ninja generator as `make test`. Linux x64 is tested locally; the five-platform workflow produces two full Linux hosts and three desktop metadata stubs. Local tests are the gate; hosted packaging is not a merge gate.
+
+After publishing, `python3 scripts/test-autorun.py --only-new` removes lmcurl/lmhtml/lmplot/lmdraw from PATH, creates one empty tool cache, executes the 16 public URLs in separate empty directories, records installed versions and image hashes, and writes versioned evidence. Omit --only-new to verify all 48.

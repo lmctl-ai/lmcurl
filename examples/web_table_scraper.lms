@@ -1,0 +1,91 @@
+# Scrape the product table into a price and stock CSV
+# Offline: lmcurl downloads; lmhtml parses; lmplot/lmdraw renders.
+mkdir("data"); mkdir("build"); mkdir("images"); mkdir("reports"); mkdir("docs/images");
+for (path in ["build/web-ready.txt","build/web-stop.txt"]) { if (file_exists(path)) { remove_file(path); } }
+write_file("data/web-requests.jsonl","");
+
+fn check(ok, message) {
+  if (!ok) { println(message); }
+  assert(ok);
+}
+fn run_program(program, path) {
+  savedsl(program, path);
+  r = system ${dsl_cli(program)} --dsl ${path};
+  if (r.code != 0) { println(r.stderr); }
+  check(r.code == 0, "native stage failed: " + path);
+  return r;
+}
+fn record_request(route, status, bytes) {
+  append_file("data/web-requests.jsonl", json_stringify({route: route, status: status, bytes: bytes, completed_ms: now(), estimated_cost_usd: 0}) + "\n");
+}
+fn download(base, route, out, follow) {
+  # Only caller-owned loopback fixtures: discovered external URLs are out of scope.
+  check(starts_with(base, "http://127.0.0.1:"), "expected loopback mock URL");
+  if (starts_with(route,base+"/site/")) { route=replace(route,base,""); }
+  check(starts_with(route, "/site/") && !contains(route, ".."), "fixture route outside scope");
+  p = _dsl_ cli="lmcurl" install="github:lmctl-ai/lmcurl@latest";
+let r=curl.session(${base}).get(${route}).proxy("").follow(${follow}).timeout(5000).limit(1048576).send();
+r.save(${out});
+file_write(${out + ".status"},str(r.status()));
+file_write(${out + ".bytes"},str(r.bytes()));
+file_write(${out + ".location"},r.header("location"));
+end _dsl_
+  run_program(p, out + ".dslb");
+  status = json_parse(read_file(out + ".status"));
+  bytes = json_parse(read_file(out + ".bytes"));
+  record_request(route, status, bytes);
+  return {status: status, bytes: bytes, path: out, location: read_file(out + ".location")};
+}
+fn serve_site() {
+  p = _dsl_ cli="lmcurl" install="github:lmctl-ai/lmcurl@latest";
+let site=curl.mock();
+site.serve("build/web-ready.txt","build/web-stop.txt",60000);
+end _dsl_
+  run_program(p,"build/web-server.dslb");
+  return true;
+}
+fn wait_and_run() {
+  for (i in range(0,600)) {
+    if (file_exists("build/web-ready.txt")) { break; }
+    sleep_ms(10);
+  }
+  check(file_exists("build/web-ready.txt"),"mock did not become ready");
+  base=trim(read_file("build/web-ready.txt"));
+  story(base);
+  write_file("build/web-stop.txt","stop\n");
+  return true;
+}
+
+fn story(base) {
+r=download(base,"/site/products.html","data/products.html",true);check(r.status==200,"product table download");
+p=_dsl_ cli="lmhtml" install="github:lmctl-ai/lmhtml@latest";
+let rows=html.load("data/products.html").select("table tr");let count=0;
+file_write("data/products.csv","sku,price,stock\n");
+for(i in range(0,rows.len())){let cells=rows.at(i).select("td");if(cells.len()==3){count=count+1;file_append("data/products.csv",cells.at(0).text()+","+cells.at(1).text()+","+cells.at(2).text()+"\n");}}
+assert_close(float(count),3.0,0.000001);
+file_write("data/web_table_scraper.csv","metric,value\nproducts,"+str(count)+"\n");
+end _dsl_
+run_program(p,"build/table-parser.dslb");rows=read_csv("data/products.csv");
+check(rows.len()==3&&rows[0].sku=="orbit"&&json_parse(str(rows[0].price))==19.5&&json_parse(str(rows[1].stock))==0,"scraped values");
+
+}
+parallel([serve_site(), wait_and_run()]);
+events=read_lines("data/web-requests.jsonl"); request_count=0;
+for (line in events) { if (!is_blank(line)) { request_count=request_count+1; } }
+write_json("reports/web_table_scraper-cost.json",{mode:"offline-loopback",currency:"USD",price_table:{loopback_request_usd:0},example_cap_usd:0.02,hard_run_cap_usd:0.25,requests:request_count,estimated_cost_usd:0});
+println("estimated cost: $0.0000 (loopback fixtures only)");
+plot = _dsl_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+plot.png("images/web_table_scraper.png",900,560);
+plot.cmd("set datafile separator ','");
+plot.cmd("set multiplot layout 1,2 title 'Scraped product catalog: prices and availability'");
+plot.cmd("unset key; set style fill solid 0.85; set boxwidth 0.65; set grid y; set yrange [0:*]");
+plot.cmd("set ylabel 'price (USD)'; set title 'Prices'");
+plot.cmd("plot 'data/products.csv' every ::1 using 0:2:xtic(1) with boxes lc rgb '#0969da'");
+plot.cmd("set ylabel 'stock (units)'; set title 'Availability'");
+plot.cmd("plot 'data/products.csv' every ::1 using 0:3:xtic(1) with boxes lc rgb '#1a7f37'");
+plot.cmd("unset multiplot");
+plot.close();
+end _dsl_
+run_program(plot,"build/web_table_scraper-plot.dslb");
+assert(copy_file("images/web_table_scraper.png","docs/images/web_table_scraper.png"));
+println("images/web_table_scraper.png");

@@ -63,7 +63,7 @@ with tempfile.TemporaryDirectory(prefix="lmcurl-serve-") as raw:
         [str(HOST), "--dsl", str(bytecode)], cwd=root, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
     )
     url = wait_ready(ready)
-    with urllib.request.urlopen(url + "/json", timeout=2) as response:
+    with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(url + "/json", timeout=2) as response:
         assert response.status == 200
         assert b'"ok":true' in response.read()
     stop.write_text("stop\n")

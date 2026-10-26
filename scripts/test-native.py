@@ -75,4 +75,7 @@ with tempfile.TemporaryDirectory(prefix='lmcurl-native-') as td:
  run('llm.mock("fixture").chat("ping").send().matches(str_repeat("x",257));',3)
  run('assert_eq(curl.query_text(str_repeat("a",8000)+"!").matches("^(a+)+$"),false);')
  run('llm.mock("fixture").chat("ping").send().matches("[");',3)
+ proxy_env={k:'http://127.0.0.1:1' for k in ('http_proxy','HTTP_PROXY','https_proxy','HTTPS_PROXY','ALL_PROXY','all_proxy')}
+ proxy_env.update(NO_PROXY='',no_proxy='')
+ run('let m=curl.mock();assert_eq(curl.session(m.url()).get("/json").proxy("").send().status(),200);m.stop();',extra=proxy_env)
 print('PASS native HTTP/framework/LLM safety: '+str(passed)+' cases')

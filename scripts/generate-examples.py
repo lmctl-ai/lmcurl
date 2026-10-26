@@ -113,3 +113,7 @@ assert(copy_file("images/login_session.png","docs/images/login_session.png"));
 println("images/login_session.png");
 '''
 p.write_text(s)
+
+# Keep the new standalone downloader/parser catalog alongside the original stories.
+import subprocess,sys
+subprocess.run([sys.executable,str(root/"scripts/generate-web-examples.py")],check=True)

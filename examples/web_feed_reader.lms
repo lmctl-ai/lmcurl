@@ -1,0 +1,95 @@
+# Read RSS and Atom headlines, publication dates and URLs
+# Offline: lmcurl downloads; lmhtml parses; lmplot/lmdraw renders.
+mkdir("data"); mkdir("build"); mkdir("images"); mkdir("reports"); mkdir("docs/images");
+for (path in ["build/web-ready.txt","build/web-stop.txt"]) { if (file_exists(path)) { remove_file(path); } }
+write_file("data/web-requests.jsonl","");
+
+fn check(ok, message) {
+  if (!ok) { println(message); }
+  assert(ok);
+}
+fn run_program(program, path) {
+  savedsl(program, path);
+  r = system ${dsl_cli(program)} --dsl ${path};
+  if (r.code != 0) { println(r.stderr); }
+  check(r.code == 0, "native stage failed: " + path);
+  return r;
+}
+fn record_request(route, status, bytes) {
+  append_file("data/web-requests.jsonl", json_stringify({route: route, status: status, bytes: bytes, completed_ms: now(), estimated_cost_usd: 0}) + "\n");
+}
+fn download(base, route, out, follow) {
+  # Only caller-owned loopback fixtures: discovered external URLs are out of scope.
+  check(starts_with(base, "http://127.0.0.1:"), "expected loopback mock URL");
+  if (starts_with(route,base+"/site/")) { route=replace(route,base,""); }
+  check(starts_with(route, "/site/") && !contains(route, ".."), "fixture route outside scope");
+  p = _dsl_ cli="lmcurl" install="github:lmctl-ai/lmcurl@latest";
+let r=curl.session(${base}).get(${route}).proxy("").follow(${follow}).timeout(5000).limit(1048576).send();
+r.save(${out});
+file_write(${out + ".status"},str(r.status()));
+file_write(${out + ".bytes"},str(r.bytes()));
+file_write(${out + ".location"},r.header("location"));
+end _dsl_
+  run_program(p, out + ".dslb");
+  status = json_parse(read_file(out + ".status"));
+  bytes = json_parse(read_file(out + ".bytes"));
+  record_request(route, status, bytes);
+  return {status: status, bytes: bytes, path: out, location: read_file(out + ".location")};
+}
+fn serve_site() {
+  p = _dsl_ cli="lmcurl" install="github:lmctl-ai/lmcurl@latest";
+let site=curl.mock();
+site.serve("build/web-ready.txt","build/web-stop.txt",60000);
+end _dsl_
+  run_program(p,"build/web-server.dslb");
+  return true;
+}
+fn wait_and_run() {
+  for (i in range(0,600)) {
+    if (file_exists("build/web-ready.txt")) { break; }
+    sleep_ms(10);
+  }
+  check(file_exists("build/web-ready.txt"),"mock did not become ready");
+  base=trim(read_file("build/web-ready.txt"));
+  story(base);
+  write_file("build/web-stop.txt","stop\n");
+  return true;
+}
+
+fn story(base) {
+responses=parallel([download(base,"/site/feed.rss","data/feed.rss",true),download(base,"/site/feed.atom","data/feed.atom",true)]);
+check(responses[0].status==200&&responses[1].status==200,"feed downloads");
+p=_dsl_ cli="lmhtml" install="github:lmctl-ai/lmhtml@latest";
+fn cell(s:string)->string{return "\""+str_replace(s,"\"","\"\"")+"\"";}
+let rss=html.load("data/feed.rss").select("item");let atom=html.load("data/feed.atom").select("entry");
+file_write("data/feed-table.csv","feed,title,published,url\n");
+for(i in range(0,rss.len())){let x=rss.at(i);file_append("data/feed-table.csv","RSS,"+cell(x.select("title").at(0).text())+","+cell(x.select("pubDate").at(0).text())+","+cell(x.select("guid").at(0).text())+"\n");}
+for(i in range(0,atom.len())){let x=atom.at(i);file_append("data/feed-table.csv","Atom,"+cell(x.select("title").at(0).text())+","+cell(x.select("updated").at(0).text())+","+cell(x.select("link").at(0).attr("href"))+"\n");}
+assert_close(float(rss.len()),2.0,0.000001);assert_close(float(atom.len()),2.0,0.000001);
+file_write("data/web_feed_reader.csv","metric,value\nRSS records,"+str(rss.len())+"\nAtom records,"+str(atom.len())+"\n");
+end _dsl_
+run_program(p,"build/feed-parser.dslb");
+rows=read_csv("data/feed-table.csv");check(rows.len()==4,"feed table rows");
+for(row in rows){check(!is_blank(row.title)&&!is_blank(row.published)&&starts_with(row.url,base+"/site/"),"feed record fields");}
+check(rows[0].title=="Orbit launch"&&rows[1].title=="Comet watch","feed headlines");
+
+}
+parallel([serve_site(), wait_and_run()]);
+events=read_lines("data/web-requests.jsonl"); request_count=0;
+for (line in events) { if (!is_blank(line)) { request_count=request_count+1; } }
+write_json("reports/web_feed_reader-cost.json",{mode:"offline-loopback",currency:"USD",price_table:{loopback_request_usd:0},example_cap_usd:0.02,hard_run_cap_usd:0.25,requests:request_count,estimated_cost_usd:0});
+println("estimated cost: $0.0000 (loopback fixtures only)");
+
+plot = _dsl_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+plot.png("images/web_feed_reader.png",900,560);
+plot.cmd("set datafile separator ','");
+plot.cmd("set title \"Read RSS and Atom headlines, publication dates and URLs\"");
+plot.cmd("set yrange [0:*]; set offsets 0,0,graph 0.12,0; set grid y; unset key; set style fill solid 0.85; set boxwidth 0.65");
+plot.cmd("set xtics rotate by -15 font ',10'");
+plot.cmd("set ylabel 'observed count / labeled value'");
+plot.cmd("plot 'data/web_feed_reader.csv' every ::1 using 0:2:xtic(1) with boxes lc rgb '#0969da', '' every ::1 using 0:2:(sprintf('%.3g',$2)) with labels offset 0,0.8");
+plot.close();
+end _dsl_
+run_program(plot,"build/web_feed_reader-plot.dslb");
+assert(copy_file("images/web_feed_reader.png","docs/images/web_feed_reader.png"));
+println("images/web_feed_reader.png");

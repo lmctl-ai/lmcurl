@@ -33,15 +33,16 @@ std::string decode(std::string s) {
   }
   return out;
 }
-Json pairs(const std::string &s, char delimiter = '&') {
+Json pairs(const std::string &s, char delimiter = '&', bool url_decode = true) {
   Json out = Json::object();
   std::size_t pos = 0;
   while (pos < s.size()) {
     auto end = s.find(delimiter, pos);
     auto item = s.substr(pos, end - pos);
     auto eq = item.find('=');
-    out[decode(trim(item.substr(0, eq)))] =
-        decode(eq == std::string::npos ? "" : trim(item.substr(eq + 1)));
+    auto key = trim(item.substr(0, eq));
+    auto value = eq == std::string::npos ? std::string() : trim(item.substr(eq + 1));
+    out[url_decode ? decode(key) : key] = url_decode ? decode(value) : value;
     if (end == std::string::npos)
       break;
     pos = end + 1;
@@ -307,7 +308,7 @@ struct MockState {
       }
     } else if (path == "/site/account.html") {
       content_type = "text/html";
-      if (pairs(headers.value("cookie", std::string()), ';').value("site_session", "") !=
+      if (pairs(headers.value("cookie", std::string()), ';', false).value("site_session", "") !=
           "fixture-site-session") {
         status = 401;
         payload = "<html><body>Unauthorized</body></html>";
@@ -469,7 +470,7 @@ struct MockState {
                    "; Path=/; HttpOnly\r\n";
       result = {{"set", true}};
     } else if (path == "/cookies")
-      result = {{"cookies", pairs(headers.value("cookie", std::string()), ';')}};
+      result = {{"cookies", pairs(headers.value("cookie", std::string()), ';', false)}};
     else if (path == "/login") {
       if (j.is_object() && j.value("username", "") == "demo" && j.value("password", "") == "demo") {
         result = {{"ok", true}, {"token", "fixture-token"}};
@@ -479,7 +480,7 @@ struct MockState {
         result = {{"ok", false}};
       }
     } else if (path == "/protected") {
-      bool ok = pairs(headers.value("cookie", std::string()), ';').value("session", "") ==
+      bool ok = pairs(headers.value("cookie", std::string()), ';', false).value("session", "") ==
                     "fixture-session" ||
                 headers.value("authorization", std::string()) == "Bearer fixture-token";
       status = ok ? 200 : 401;

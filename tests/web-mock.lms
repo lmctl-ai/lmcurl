@@ -15,6 +15,8 @@ assert_eq(curl.session(m.url()).get("/site/account.html").header("Cookie","not_s
 assert_eq(s.get("/site/page/1.html").send().status(),200);
 assert_eq(s.get("/site/page/3.html").send().status(),200);
 assert_eq(s.get("/site/page/99.html").send().status(),404);
+assert_eq(curl.session(m.url()).get("/protected").header("Cookie","session=%66ixture-session").send().status(),401);
+assert_eq(curl.session(m.url()).get("/site/account.html").header("Cookie","site_session=fixture-site-session-extra").send().status(),401);
 let anonymous=curl.session(m.url()).get("/site/account.html").send();
 assert_eq(products.status(),200); assert_eq(api.status(),200); assert_eq(feed.status(),200); assert_eq(login.status(),200); assert_eq(robots.status(),200);
 assert_eq(missing.status(),404); assert_eq(bad.status(),403); assert_eq(good.status(),200); assert_eq(account.status(),200); assert_eq(anonymous.status(),401);

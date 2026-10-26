@@ -1,71 +1,137 @@
 # lmcurl
 
-Scriptable HTTP, REST and LLM checks in one MIT lmscript host. The examples use an in-process mock server, so the gallery is reproducible without credentials.
+Download with upstream libcurl, parse with lmhtml, and turn asserted results into reports and pictures.
 
-| Picture | Story and autorun |
+| Mirror parsed HTML, stylesheet, script and image dependencies | Poll until the price is at most 20 USD and stock is positive |
 | --- | --- |
-| ![REST CRUD](docs/images/rest_crud.png) | [REST CRUD](examples/rest_crud.lms): create, update and delete a user. `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/rest_crud.lms` |
-| ![Login request flow](docs/images/login_session.png) | [Login session](examples/login_session.lms): request-flow diagram showing captured authentication and protected access. `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/login_session.lms` |
-| ![Cookies](docs/images/cookie_jar.png) | [Cookie jar](examples/cookie_jar.lms): preserve cookies between requests. `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/cookie_jar.lms` |
-| ![JSON contract](docs/images/json_contract.png) | [JSON Schema](examples/json_contract.lms): validate a response contract. `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/json_contract.lms` |
-| ![Latency](docs/images/load_latency.png) | [Load latency](examples/load_latency.lms): bounded concurrent requests and p95 timing. `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/load_latency.lms` |
-| ![LLM matrix](docs/images/llm_matrix.png) | [LLM matrix](examples/llm_matrix.lms): compare prompt contracts across three mock models. `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/llm_matrix.lms` |
+| ![Mirror parsed HTML, stylesheet, script and image dependencies](docs/images/web_site_mirror.png) | ![Poll until the price is at most 20 USD and stock is positive](docs/images/web_price_watcher.png) |
+| `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_site_mirror.lms` | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_price_watcher.lms` |
 
-The remaining gallery captions are directly runnable from an empty directory:
-
-| Example | Autorun |
+| Scrape the product table into a price and stock CSV | Check discovered site links and report missing or denied targets |
 | --- | --- |
-| auth_boundary | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/auth_boundary.lms` |
-| cookie_jar | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/cookie_jar.lms` |
-| compression | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/compression.lms` |
-| csv_cases | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/csv_cases.lms` |
-| failure_reports | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/failure_reports.lms` |
-| form_and_upload | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/form_and_upload.lms` |
-| html_extract | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/html_extract.lms` |
-| json_cases | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/json_cases.lms` |
-| jsonpath_projection | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/jsonpath_projection.lms` |
-| llm_json | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/llm_json.lms` |
-| llm_prompt | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/llm_prompt.lms` |
-| llm_replay | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/llm_replay.lms` |
-| llm_sampling | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/llm_sampling.lms` |
-| llm_streams | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/llm_streams.lms` |
-| load_latency | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/load_latency.lms` |
-| openapi_contract | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/openapi_contract.lms` |
-| parallel_checks | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/parallel_checks.lms` |
-| poll_readiness | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/poll_readiness.lms` |
-| redirect_chain | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/redirect_chain.lms` |
-| response_limits | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/response_limits.lms` |
-| retry_recovery | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/retry_recovery.lms` |
-| secret_redaction | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/secret_redaction.lms` |
-| snapshot_contract | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/snapshot_contract.lms` |
-| sse_events | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/sse_events.lms` |
-| suite_lifecycle | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/suite_lifecycle.lms` |
-| tag_filter | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/tag_filter.lms` |
-| timing_breakdown | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/timing_breakdown.lms` |
-| xml_catalog | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/xml_catalog.lms` |
+| ![Scrape the product table into a price and stock CSV](docs/images/web_table_scraper.png) | ![Check discovered site links and report missing or denied targets](docs/images/web_link_checker.png) |
+| `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_table_scraper.lms` | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_link_checker.lms` |
 
-`examples/catalog.json` is the machine-readable source of the same 32 image/script pairs.
-
-There are 32 self-executing examples covering REST CRUD, login and cookies, authentication, redirects, retries and polling, JSON/XML/HTML assertions, SSE, multipart/form data, data-driven suites, reports, snapshots, load checks, cassettes, and LLM prompts, streaming, sampling and model matrices. Every example starts the built-in loopback mock where network access is unnecessary and writes its own `images/<name>.png`.
-
-Install the released compiler and build locally:
+| A second crawl changes content; a third crawl stays stable | Parse the CSRF field, post credentials and retain the login cookie |
+| --- | --- |
+| ![A second crawl changes content; a third crawl stays stable](docs/images/web_content_diff.png) | ![Parse the CSRF field, post credentials and retain the login cookie](docs/images/web_login_form.png) |
+| `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_content_diff.lms` | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_login_form.lms` |
 
 ```sh
 npm install -g @lmctl-ai/lmctl@0.2.420
-bash scripts/sync-deps.sh
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-cmake --build build
-bash test.sh
+lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_site_mirror.lms
 ```
 
-The host accepts `--dsl`, `--dry-run`, `--version`, `--help`, `--notices`, `--dsl-schema` and `--dsl-signatures`. Linux release binaries use dynamic system glibc (minimum 2.35); libcurl, TLS and other permissive dependencies are static. macOS and Windows are explicit unsupported stubs in this initial release.
+The **16 new downloader/parser stories** run against lmcurl’s native loopback mock site. lmcurl performs HTTP; lmhtml v0.7.3 selects elements and attributes, extracts rows, and compares documents. CSV/text/JSON files pass values between the hosts. The mirror writes `mirror/index.html`, local assets and `about.html`; every story writes `images/<name>.png` and reports under `reports/`. Host installation needs GitHub access once; the example workloads use only localhost.
 
-The API is typed around `Curl`, `Session`, `Request`, `Response`, `Query`, `Suite`, `Test`, `Report`, `LoadResult` and `Result`. Requests support JSON/raw/form/multipart bodies, headers, cookies, redirects, basic/digest/bearer auth, retries, timeouts, response limits, HTTP/2, TLS controls and timing metrics. Query supports bounded JSONPath, XPath with external access disabled, predicates, filters and JSON Schema validation. Regex predicates use POSIX ERE with common `\\d`, `\\w` and `\\s` conveniences; backreferences and lookaround are unavailable. Input is capped at 8192 bytes and patterns at 256 bytes. Reports write console, TAP, JUnit, JSON and HTML files.
+<details>
+<summary>Ten more downloader/parser pictures and runnable captions</summary>
 
-`LMCURL_MAX_MEMORY_MB` defaults to 4096 MiB and rejects invalid values. Request bodies, responses, JSON, XML and mock connections are bounded. Streaming buffers the bounded response before assertions; it does not expose a token callback. `LMCURL_LIVE=1` is required for provider calls. `OPENROUTER_API_KEY`, `DEEPSEEK_API_KEY`, `OLLAMA_API_KEY`, `OLLAMA_API_BASE` and `OLLAMA_HOST` are read only from the environment; values are redacted from logs, reports, cassettes and images. LLM examples use built-in mock fixtures and replay cassettes by default.
+| Parse an XML sitemap, scope its URLs, then crawl them | Read RSS and Atom headlines, publication dates and URLs |
+| --- | --- |
+| ![Parse an XML sitemap, scope its URLs, then crawl them](docs/images/web_sitemap_crawler.png) | ![Read RSS and Atom headlines, publication dates and URLs](docs/images/web_feed_reader.png) |
+| `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_sitemap_crawler.lms` | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_feed_reader.lms` |
 
-LLM calls reserve a default `$0.02` example cap and hard `$0.25` run cap. The recorded live evidence used an OpenRouter free model ($0), DeepSeek ($0.00000360), Ollama cloud ($0 marginal subscription allocation) and Ollama local ($0), with no secrets recorded; see [evidence/live-llm-v010.json](evidence/live-llm-v010.json).
+| Follow parsed next links to collect nine articles | SEO audit: metadata, headings and image alternatives |
+| --- | --- |
+| ![Follow parsed next links to collect nine articles](docs/images/web_pagination.png) | ![SEO audit: metadata, headings and image alternatives](docs/images/web_seo_audit.png) |
+| `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_pagination.lms` | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_seo_audit.lms` |
 
-See [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES), [durable-memory](durable-memory/index.md), and [LICENSE](LICENSE). Public CI is fake/offline by default; live credentials never belong in CI.
+| Find broken image URLs and follow every redirect hop | Compare each product SKU, price and stock with the API |
+| --- | --- |
+| ![Find broken image URLs and follow every redirect hop](docs/images/web_image_redirect_audit.png) | ![Compare each product SKU, price and stock with the API](docs/images/web_api_html_consistency.png) |
+| `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_image_redirect_audit.lms` | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_api_html_consistency.lms` |
 
-[v0.1.0 release](https://github.com/lmctl-ai/lmcurl/releases/tag/v0.1.0) includes five executables and SHA256SUMS. [All 32 public autoruns](evidence/autorun-v010.json) passed from empty directories with a fresh tool cache. For source builds, use current main, which includes the build-only portability fixes described in the release notes.
+| Scan basic labels, image alternatives and empty controls | Extract and inspect JSON-LD and OpenGraph fields |
+| --- | --- |
+| ![Scan basic labels, image alternatives and empty controls](docs/images/web_accessibility_scan.png) | ![Extract and inspect JSON-LD and OpenGraph fields](docs/images/web_metadata_extractor.png) |
+| `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_accessibility_scan.lms` | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_metadata_extractor.lms` |
+
+| Inventory form actions, methods and named controls | Respect robots exclusions and wait between allowed requests |
+| --- | --- |
+| ![Inventory form actions, methods and named controls](docs/images/web_form_inventory.png) | ![Respect robots exclusions and wait between allowed requests](docs/images/web_robots_crawler.png) |
+| `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_form_inventory.lms` | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_robots_crawler.lms` |
+
+</details>
+
+Each new example records its actual requests in `data/web-requests.jsonl`, writes `reports/<name>-cost.json` with a zero-price loopback table and the $0.02/$0.25 caps, and prints `estimated cost: $0.0000`. No cloud/LLM calls or credentials are required. Login credentials and the CSRF value are public fixtures; cookie values stay inside one downloader process.
+
+Independent downloads use fixed `parallel([download(...), ...])` call lists. The shared helper can be reused when dynamic fan-out is available. `Mock.serve(ready_file, stop_file, timeout_ms)` publishes readiness atomically and shuts down on the stop signal or a deadline (maximum 120 seconds); the examples use 60 seconds. Requests have five-second timeouts and a 1 MiB response limit.
+
+The robots example implements the fixture’s `User-agent: *`, `Disallow` prefixes and `Crawl-delay`, measures its delay and proves that private URLs were not requested. The accessibility example is a basic smell scan. XML/feed examples extract unprefixed sitemap/RSS/Atom fields with the HTML parser; RSS URLs use permalink GUIDs. These are bounded recipes rather than complete robots, accessibility or XML validators.
+
+## All 48 examples
+
+| Story | Run from an empty directory |
+| --- | --- |
+| A user record through its complete lifecycle | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/rest_crud.lms` |
+| Login capture unlocks a protected resource | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/login_session.lms` |
+| A session keeps cookies across requests | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/cookie_jar.lms` |
+| Anonymous and authenticated access | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/auth_boundary.lms` |
+| Following a bounded redirect chain | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/redirect_chain.lms` |
+| Recovery after three transient failures | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/retry_recovery.lms` |
+| Poll assertions until the service is ready | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/poll_readiness.lms` |
+| Required fields and collection bounds | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/json_contract.lms` |
+| Typed JSONPath projections and predicates | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/jsonpath_projection.lms` |
+| XPath checks on an XML catalog | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/xml_catalog.lms` |
+| Extracting HTML with XPath | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/html_extract.lms` |
+| Three CSV rows exercise one request template | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/csv_cases.lms` |
+| JSON data drives a reusable request | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/json_cases.lms` |
+| Select only the smoke contract | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/tag_filter.lms` |
+| Independent checks run concurrently | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/parallel_checks.lms` |
+| A failed contract produces actionable reports | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/failure_reports.lms` |
+| Setup runs before protected checks | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/suite_lifecycle.lms` |
+| Form encoding and multipart upload | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/form_and_upload.lms` |
+| Event-stream data stays bounded and inspectable | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/sse_events.lms` |
+| Compressed responses are decoded before queries | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/compression.lms` |
+| Oversized responses fail their contract | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/response_limits.lms` |
+| Snapshots detect response regressions | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/snapshot_contract.lms` |
+| Check a JSON OpenAPI response contract | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/openapi_contract.lms` |
+| Virtual users and latency thresholds | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/load_latency.lms` |
+| A prompt regression is an ordinary assertion | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/llm_prompt.lms` |
+| Both OpenAI and Ollama streaming fixtures | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/llm_streams.lms` |
+| Sampling reports measured prompt pass rates | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/llm_sampling.lms` |
+| A model matrix compares one prompt side by side | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/llm_matrix.lms` |
+| Recorded completions replay without credentials | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/llm_replay.lms` |
+| Structured completions have schema contracts | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/llm_json.lms` |
+| Where a delayed response spends its time | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/timing_breakdown.lms` |
+| Credentials stay out of saved artifacts | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/secret_redaction.lms` |
+| Check discovered site links and report missing or denied targets | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_link_checker.lms` |
+| Parse an XML sitemap, scope its URLs, then crawl them | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_sitemap_crawler.lms` |
+| Read RSS and Atom headlines, publication dates and URLs | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_feed_reader.lms` |
+| Scrape the product table into a price and stock CSV | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_table_scraper.lms` |
+| Poll until the price is at most 20 USD and stock is positive | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_price_watcher.lms` |
+| Parse the CSRF field, post credentials and retain the login cookie | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_login_form.lms` |
+| Follow parsed next links to collect nine articles | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_pagination.lms` |
+| Mirror parsed HTML, stylesheet, script and image dependencies | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_site_mirror.lms` |
+| SEO audit: metadata, headings and image alternatives | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_seo_audit.lms` |
+| Find broken image URLs and follow every redirect hop | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_image_redirect_audit.lms` |
+| Compare each product SKU, price and stock with the API | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_api_html_consistency.lms` |
+| A second crawl changes content; a third crawl stays stable | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_content_diff.lms` |
+| Scan basic labels, image alternatives and empty controls | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_accessibility_scan.lms` |
+| Extract and inspect JSON-LD and OpenGraph fields | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_metadata_extractor.lms` |
+| Inventory form actions, methods and named controls | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_form_inventory.lms` |
+| Respect robots exclusions and wait between allowed requests | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_robots_crawler.lms` |
+
+## Host API and limits
+
+Typed `Session`, `Request`, `Response`, `Query`, `Suite`, `Test`, `Report`, `LoadResult`, `Provider`, `Chat`, `Result`, `Sample` and `Matrix` objects cover headers/bodies/forms/uploads, cookies/auth, redirects, retries, polling, JSONPath/XPath, JSON Schema/OpenAPI response checks, snapshots and bounded load checks. Reports support console, TAP, JUnit, JSON, CSV and HTML. See [the generated schema](schema/lmcurl.dsl.json) and `lmcurl --dsl-signatures` (258 lines including standard functions and contexts).
+
+`LMCURL_MAX_MEMORY_MB` defaults to 4096 MiB. Responses, parsers, object counts and concurrency have additional hard limits. Regex assertions use POSIX ERE without backreferences/lookarounds, at most 8192 text bytes and 256 pattern bytes; common `\d`, `\w` and `\s` escapes are translated. Streaming buffers a bounded response before assertions. `Request.proxy("")` explicitly disables environment proxies, as used by the offline download helper.
+
+The LLM layer supports OpenRouter, DeepSeek and Ollama, streaming/tool assembly, JSON mode, sampling, model matrices and cassette replay. Live calls require `LMCURL_LIVE=1` and are forbidden in CI. Pre-call cost reservations default to $0.02, with a hard $0.25 process ceiling. Known key values and credential-shaped strings are redacted from exported artifacts. The original [live evidence](evidence/live-llm-v010.json) records four provider paths with total estimated cost $0.00000360, excluding Ollama subscription/infrastructure costs; its cloud Ollama call exhausted the small output allowance without visible text. No live calls were needed for these new examples.
+
+Linux x64 and ARM64 are full native hosts requiring glibc >=2.35; application libraries are static and permissive. macOS x64/ARM64 and Windows x64 are explicit metadata stubs and reject DSL execution.
+
+## Build and verify
+
+```sh
+bash scripts/sync-deps.sh
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel 2
+BUILD_DIR=build LMCURL_TEST_NETWORK=1 bash test.sh
+```
+
+The local gate checks pins, exact schema/signatures/notices, dynamic glibc linkage, native safety regressions, parser integration, mock lifecycle and memory limits. With renderers available it executes all 48 stories and validates their images and new cost ledgers; otherwise it skips rendering loudly and checks committed images. `scripts/test-autorun.py --only-new` verifies the 16 new public URLs with a fresh cache and all four hosts removed from PATH.
+
+[Releases and SHA256SUMS](https://github.com/lmctl-ai/lmcurl/releases) · [Independent review](docs/REVIEW.md) · [Durable memory](durable-memory/index.md) · [Third-party notices](THIRD_PARTY_NOTICES) · [MIT license](LICENSE).

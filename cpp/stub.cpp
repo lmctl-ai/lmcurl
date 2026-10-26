@@ -8,7 +8,7 @@
 #endif
 #include "notices_embedded.hpp"
 #ifndef LMCURL_VERSION
-#define LMCURL_VERSION "0.1.0"
+#define LMCURL_VERSION "0.1.1"
 #endif
 int main(int argc, char **argv) {
 #ifdef _WIN32

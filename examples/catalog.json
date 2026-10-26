@@ -190,5 +190,117 @@
     "title": "Credentials stay out of saved artifacts",
     "script": "examples/secret_redaction.lms",
     "image": "docs/images/secret_redaction.png"
+  },
+  {
+    "name": "web_link_checker",
+    "title": "Check discovered site links and report missing or denied targets",
+    "script": "examples/web_link_checker.lms",
+    "image": "docs/images/web_link_checker.png",
+    "category": "web-downloader-parser"
+  },
+  {
+    "name": "web_sitemap_crawler",
+    "title": "Parse an XML sitemap, scope its URLs, then crawl them",
+    "script": "examples/web_sitemap_crawler.lms",
+    "image": "docs/images/web_sitemap_crawler.png",
+    "category": "web-downloader-parser"
+  },
+  {
+    "name": "web_feed_reader",
+    "title": "Read RSS and Atom headlines, publication dates and URLs",
+    "script": "examples/web_feed_reader.lms",
+    "image": "docs/images/web_feed_reader.png",
+    "category": "web-downloader-parser"
+  },
+  {
+    "name": "web_table_scraper",
+    "title": "Scrape the product table into a price and stock CSV",
+    "script": "examples/web_table_scraper.lms",
+    "image": "docs/images/web_table_scraper.png",
+    "category": "web-downloader-parser"
+  },
+  {
+    "name": "web_price_watcher",
+    "title": "Poll until the price is at most 20 USD and stock is positive",
+    "script": "examples/web_price_watcher.lms",
+    "image": "docs/images/web_price_watcher.png",
+    "category": "web-downloader-parser"
+  },
+  {
+    "name": "web_login_form",
+    "title": "Parse the CSRF field, post credentials and retain the login cookie",
+    "script": "examples/web_login_form.lms",
+    "image": "docs/images/web_login_form.png",
+    "category": "web-downloader-parser"
+  },
+  {
+    "name": "web_pagination",
+    "title": "Follow parsed next links to collect nine articles",
+    "script": "examples/web_pagination.lms",
+    "image": "docs/images/web_pagination.png",
+    "category": "web-downloader-parser"
+  },
+  {
+    "name": "web_site_mirror",
+    "title": "Mirror parsed HTML, stylesheet, script and image dependencies",
+    "script": "examples/web_site_mirror.lms",
+    "image": "docs/images/web_site_mirror.png",
+    "category": "web-downloader-parser"
+  },
+  {
+    "name": "web_seo_audit",
+    "title": "SEO audit: metadata, headings and image alternatives",
+    "script": "examples/web_seo_audit.lms",
+    "image": "docs/images/web_seo_audit.png",
+    "category": "web-downloader-parser"
+  },
+  {
+    "name": "web_image_redirect_audit",
+    "title": "Find broken image URLs and follow every redirect hop",
+    "script": "examples/web_image_redirect_audit.lms",
+    "image": "docs/images/web_image_redirect_audit.png",
+    "category": "web-downloader-parser"
+  },
+  {
+    "name": "web_api_html_consistency",
+    "title": "Compare each product SKU, price and stock with the API",
+    "script": "examples/web_api_html_consistency.lms",
+    "image": "docs/images/web_api_html_consistency.png",
+    "category": "web-downloader-parser"
+  },
+  {
+    "name": "web_content_diff",
+    "title": "A second crawl changes content; a third crawl stays stable",
+    "script": "examples/web_content_diff.lms",
+    "image": "docs/images/web_content_diff.png",
+    "category": "web-downloader-parser"
+  },
+  {
+    "name": "web_accessibility_scan",
+    "title": "Scan basic labels, image alternatives and empty controls",
+    "script": "examples/web_accessibility_scan.lms",
+    "image": "docs/images/web_accessibility_scan.png",
+    "category": "web-downloader-parser"
+  },
+  {
+    "name": "web_metadata_extractor",
+    "title": "Extract and inspect JSON-LD and OpenGraph fields",
+    "script": "examples/web_metadata_extractor.lms",
+    "image": "docs/images/web_metadata_extractor.png",
+    "category": "web-downloader-parser"
+  },
+  {
+    "name": "web_form_inventory",
+    "title": "Inventory form actions, methods and named controls",
+    "script": "examples/web_form_inventory.lms",
+    "image": "docs/images/web_form_inventory.png",
+    "category": "web-downloader-parser"
+  },
+  {
+    "name": "web_robots_crawler",
+    "title": "Respect robots exclusions and wait between allowed requests",
+    "script": "examples/web_robots_crawler.lms",
+    "image": "docs/images/web_robots_crawler.png",
+    "category": "web-downloader-parser"
   }
 ]

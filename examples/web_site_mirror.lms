@@ -1,0 +1,106 @@
+# Mirror parsed HTML, stylesheet, script and image dependencies
+# Offline: lmcurl downloads; lmhtml parses; lmplot/lmdraw renders.
+mkdir("data"); mkdir("build"); mkdir("images"); mkdir("reports"); mkdir("docs/images");
+for (path in ["build/web-ready.txt","build/web-stop.txt"]) { if (file_exists(path)) { remove_file(path); } }
+write_file("data/web-requests.jsonl","");
+
+fn check(ok, message) {
+  if (!ok) { println(message); }
+  assert(ok);
+}
+fn run_program(program, path) {
+  savedsl(program, path);
+  r = system ${dsl_cli(program)} --dsl ${path};
+  if (r.code != 0) { println(r.stderr); }
+  check(r.code == 0, "native stage failed: " + path);
+  return r;
+}
+fn record_request(route, status, bytes) {
+  append_file("data/web-requests.jsonl", json_stringify({route: route, status: status, bytes: bytes, completed_ms: now(), estimated_cost_usd: 0}) + "\n");
+}
+fn download(base, route, out, follow) {
+  # Only caller-owned loopback fixtures: discovered external URLs are out of scope.
+  check(starts_with(base, "http://127.0.0.1:"), "expected loopback mock URL");
+  if (starts_with(route,base+"/site/")) { route=replace(route,base,""); }
+  check(starts_with(route, "/site/") && !contains(route, ".."), "fixture route outside scope");
+  p = _dsl_ cli="lmcurl" install="github:lmctl-ai/lmcurl@latest";
+let r=curl.session(${base}).get(${route}).proxy("").follow(${follow}).timeout(5000).limit(1048576).send();
+r.save(${out});
+file_write(${out + ".status"},str(r.status()));
+file_write(${out + ".bytes"},str(r.bytes()));
+file_write(${out + ".location"},r.header("location"));
+end _dsl_
+  run_program(p, out + ".dslb");
+  status = json_parse(read_file(out + ".status"));
+  bytes = json_parse(read_file(out + ".bytes"));
+  record_request(route, status, bytes);
+  return {status: status, bytes: bytes, path: out, location: read_file(out + ".location")};
+}
+fn serve_site() {
+  p = _dsl_ cli="lmcurl" install="github:lmctl-ai/lmcurl@latest";
+let site=curl.mock();
+site.serve("build/web-ready.txt","build/web-stop.txt",60000);
+end _dsl_
+  run_program(p,"build/web-server.dslb");
+  return true;
+}
+fn wait_and_run() {
+  for (i in range(0,600)) {
+    if (file_exists("build/web-ready.txt")) { break; }
+    sleep_ms(10);
+  }
+  check(file_exists("build/web-ready.txt"),"mock did not become ready");
+  base=trim(read_file("build/web-ready.txt"));
+  story(base);
+  write_file("build/web-stop.txt","stop\n");
+  return true;
+}
+
+fn story(base) {
+mkdir("mirror/assets");r=download(base,"/site/mirror.html","data/mirror-source.html",true);check(r.status==200,"mirror seed");
+p=_dsl_ cli="lmhtml" install="github:lmctl-ai/lmhtml@latest";
+let doc=html.load("data/mirror-source.html");let css=doc.select("link[rel=stylesheet]");let js=doc.select("script[src]");let images=doc.select("img[src]");let pages=doc.select("a[href]");
+assert_close(float(css.len()),1.0,0.000001);assert_close(float(js.len()),1.0,0.000001);assert_close(float(images.len()),1.0,0.000001);assert_close(float(pages.len()),1.0,0.000001);
+file_write("data/mirror-urls.txt",css.at(0).attr("href")+"\n"+js.at(0).attr("src")+"\n"+images.at(0).attr("src")+"\n"+pages.at(0).attr("href")+"\n");
+css.at(0).set_attr("href","assets/site.css");js.at(0).set_attr("src","assets/app.js");images.at(0).set_attr("src","assets/logo.svg");pages.at(0).set_attr("href","about.html");
+html.save(doc,"mirror/index.html");
+end _dsl_
+run_program(p,"build/mirror-parser.dslb");urls=read_lines("data/mirror-urls.txt");check(urls.len()==4,"mirror dependency count");
+# The fixed list is intentionally ready to replace with a dynamic parallel_map.
+results=parallel([download(base,urls[0],"mirror/assets/site.css",true),download(base,urls[1],"mirror/assets/app.js",true),download(base,urls[2],"mirror/assets/logo.svg",true),download(base,urls[3],"mirror/about.html",true)]);
+bytes=0;for(result in results){check(result.status==200&&result.bytes>0,"mirror asset download");bytes=bytes+result.bytes;}
+check(file_exists("mirror/index.html")&&file_exists("mirror/about.html"),"offline mirror pages");
+write_file("data/web_site_mirror.csv","metric,value\ndependencies,"+str(results.len())+"\nroot pages,1\n");
+write_json("reports/mirror-manifest.json",{root:"mirror/index.html",dependencies:urls,downloaded_bytes:bytes});
+
+}
+parallel([serve_site(), wait_and_run()]);
+events=read_lines("data/web-requests.jsonl"); request_count=0;
+for (line in events) { if (!is_blank(line)) { request_count=request_count+1; } }
+write_json("reports/web_site_mirror-cost.json",{mode:"offline-loopback",currency:"USD",price_table:{loopback_request_usd:0},example_cap_usd:0.02,hard_run_cap_usd:0.25,requests:request_count,estimated_cost_usd:0});
+println("estimated cost: $0.0000 (loopback fixtures only)");
+draw = _dsl_ cli="lmdraw" install="github:lmctl-ai/lmdraw@latest";
+
+scene.canvas(900,560,"#0d1726");
+scene.text(45.0,55.0,26.0,"A parsed page becomes a self-contained mirror","#edf5ff");
+scene.text(45.0,90.0,16.0,"Four independent dependencies downloaded with fixed parallel calls","#a9bdd5");
+fn box(x:float,y:float,title:string,detail:string)->void{
+ let r=scene.rect(x-98.0,y-43.0,196.0,86.0,"#17344c");r.set_attr("rx","10");
+ let t=scene.text(x,y-9.0,18.0,title,"#ffffff");t.set_attr("text-anchor","middle");
+ let d=scene.text(x,y+20.0,12.0,detail,"#b6e3ff");d.set_attr("text-anchor","middle");
+}
+box(450.0,165.0,"index.html","rewritten local references");
+for(i in range(0,4)){
+ let x=120.0+float(i)*220.0;let e=scene.line(450.0,218.0,x,307.0,"#79c0ff",2.5);e.set_attr("marker-end","arrow");
+}
+let urls=file_lines("data/mirror-urls.txt");
+box(120.0,360.0,"Stylesheet",urls.at(0));box(340.0,360.0,"JavaScript",urls.at(1));
+box(560.0,360.0,"SVG image",urls.at(2));box(780.0,360.0,"HTML page",urls.at(3));
+scene.text(45.0,475.0,19.0,"All four responses: HTTP 200, non-empty body","#aff2ce");
+scene.text(45.0,515.0,15.0,"Local output: mirror/index.html + assets/ + about.html","#a9bdd5");
+scene.render_png("images/web_site_mirror.png",900,560,1);
+
+end _dsl_
+run_program(draw,"build/web_site_mirror-draw.dslb");
+assert(copy_file("images/web_site_mirror.png","docs/images/web_site_mirror.png"));
+println("images/web_site_mirror.png");

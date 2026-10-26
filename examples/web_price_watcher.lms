@@ -1,0 +1,94 @@
+# Poll until the price is at most 20 USD and stock is positive
+# Offline: lmcurl downloads; lmhtml parses; lmplot/lmdraw renders.
+mkdir("data"); mkdir("build"); mkdir("images"); mkdir("reports"); mkdir("docs/images");
+for (path in ["build/web-ready.txt","build/web-stop.txt"]) { if (file_exists(path)) { remove_file(path); } }
+write_file("data/web-requests.jsonl","");
+
+fn check(ok, message) {
+  if (!ok) { println(message); }
+  assert(ok);
+}
+fn run_program(program, path) {
+  savedsl(program, path);
+  r = system ${dsl_cli(program)} --dsl ${path};
+  if (r.code != 0) { println(r.stderr); }
+  check(r.code == 0, "native stage failed: " + path);
+  return r;
+}
+fn record_request(route, status, bytes) {
+  append_file("data/web-requests.jsonl", json_stringify({route: route, status: status, bytes: bytes, completed_ms: now(), estimated_cost_usd: 0}) + "\n");
+}
+fn download(base, route, out, follow) {
+  # Only caller-owned loopback fixtures: discovered external URLs are out of scope.
+  check(starts_with(base, "http://127.0.0.1:"), "expected loopback mock URL");
+  if (starts_with(route,base+"/site/")) { route=replace(route,base,""); }
+  check(starts_with(route, "/site/") && !contains(route, ".."), "fixture route outside scope");
+  p = _dsl_ cli="lmcurl" install="github:lmctl-ai/lmcurl@latest";
+let r=curl.session(${base}).get(${route}).proxy("").follow(${follow}).timeout(5000).limit(1048576).send();
+r.save(${out});
+file_write(${out + ".status"},str(r.status()));
+file_write(${out + ".bytes"},str(r.bytes()));
+file_write(${out + ".location"},r.header("location"));
+end _dsl_
+  run_program(p, out + ".dslb");
+  status = json_parse(read_file(out + ".status"));
+  bytes = json_parse(read_file(out + ".bytes"));
+  record_request(route, status, bytes);
+  return {status: status, bytes: bytes, path: out, location: read_file(out + ".location")};
+}
+fn serve_site() {
+  p = _dsl_ cli="lmcurl" install="github:lmctl-ai/lmcurl@latest";
+let site=curl.mock();
+site.serve("build/web-ready.txt","build/web-stop.txt",60000);
+end _dsl_
+  run_program(p,"build/web-server.dslb");
+  return true;
+}
+fn wait_and_run() {
+  for (i in range(0,600)) {
+    if (file_exists("build/web-ready.txt")) { break; }
+    sleep_ms(10);
+  }
+  check(file_exists("build/web-ready.txt"),"mock did not become ready");
+  base=trim(read_file("build/web-ready.txt"));
+  story(base);
+  write_file("build/web-stop.txt","stop\n");
+  return true;
+}
+
+fn story(base) {
+write_file("data/watch-history.csv","poll,price,stock\n");attempts=0;price=100;stock=0;
+for(i in range(0,5)){
+ path="data/watch-"+str(i)+".html";r=download(base,"/site/watch.html",path,true);check(r.status==200,"price poll");
+ p=_dsl_ cli="lmhtml" install="github:lmctl-ai/lmhtml@latest";
+let d=html.load(${path});
+file_write("data/watch-price.txt",d.select(".price").at(0).text());file_write("data/watch-stock.txt",d.select(".stock").at(0).text());
+end _dsl_
+ run_program(p,"build/watch-parser-"+str(i)+".dslb");price=json_parse(read_file("data/watch-price.txt"));stock=json_parse(read_file("data/watch-stock.txt"));attempts=attempts+1;
+ append_file("data/watch-history.csv",str(attempts)+","+str(price)+","+str(stock)+"\n");
+ if(price<=20&&stock>0){break;}sleep_ms(20);
+}
+check(attempts==3&&price==19&&stock==3,"watch threshold");
+write_file("data/web_price_watcher.csv","metric,value\npolls,"+str(attempts)+"\nfinal price,"+str(price)+"\nfinal stock,"+str(stock)+"\n");
+
+}
+parallel([serve_site(), wait_and_run()]);
+events=read_lines("data/web-requests.jsonl"); request_count=0;
+for (line in events) { if (!is_blank(line)) { request_count=request_count+1; } }
+write_json("reports/web_price_watcher-cost.json",{mode:"offline-loopback",currency:"USD",price_table:{loopback_request_usd:0},example_cap_usd:0.02,hard_run_cap_usd:0.25,requests:request_count,estimated_cost_usd:0});
+println("estimated cost: $0.0000 (loopback fixtures only)");
+plot = _dsl_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+plot.png("images/web_price_watcher.png",900,560);
+plot.cmd("set datafile separator ','");
+plot.cmd("set multiplot layout 1,2 title 'Observed price/stock polls; buy threshold is 20 USD'");
+plot.cmd("set key top right; set grid; set xrange [0.5:3.5]; set xtics 1; set xlabel 'poll'");
+plot.cmd("set title 'Price'; set ylabel 'USD'; set yrange [15:28]");
+plot.cmd("plot 'data/watch-history.csv' every ::1 using 1:2 with linespoints lw 3 pt 7 lc rgb '#0969da' title 'price', 20 with lines dt 2 lc rgb '#cf222e' title 'threshold'");
+plot.cmd("set title 'Stock'; set ylabel 'units'; set yrange [0:4]; unset key; set style fill solid 0.85; set boxwidth 0.6");
+plot.cmd("plot 'data/watch-history.csv' every ::1 using 1:3 with boxes lc rgb '#1a7f37'");
+plot.cmd("unset multiplot");
+plot.close();
+end _dsl_
+run_program(plot,"build/web_price_watcher-plot.dslb");
+assert(copy_file("images/web_price_watcher.png","docs/images/web_price_watcher.png"));
+println("images/web_price_watcher.png");

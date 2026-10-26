@@ -115,6 +115,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/lmcurl-* dist/SHA256SUMS \
-            --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" \
-            --notes "Five tested platform binaries. Linux dynamically links system glibc; macOS and Windows use the documented stub until native TLS packaging is enabled. Licenses: lmcurl --notices."
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release already published; preserving its verified assets and checksums."
+          else
+            gh release create "$GITHUB_REF_NAME" dist/lmcurl-* dist/SHA256SUMS \
+              --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" \
+              --notes "Five tested platform binaries. Linux dynamically links system glibc; macOS and Windows use the documented stub until native TLS packaging is enabled. Licenses: lmcurl --notices."
+          fi
