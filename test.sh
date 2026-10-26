@@ -4,7 +4,7 @@ cd "$(dirname "$0")"
 BUILD_DIR="${BUILD_DIR:-build}"
 export LMCURL_LIVE=0
 case "$(uname -s)" in Darwin|MINGW*|MSYS*|CYGWIN*)
- cmake -S . -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Release >/dev/null
+ cmake -S . -B "$BUILD_DIR" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER="${CC:-gcc}" -DCMAKE_CXX_COMPILER="${CXX:-g++}" >/dev/null
  cmake --build "$BUILD_DIR" --parallel 2 >/dev/null
  exe="$BUILD_DIR/lmcurl"; [[ -f "$exe.exe" ]] && exe="$exe.exe"
  [[ "$("$exe" --version)" == 'lmcurl 0.1.0' ]]
