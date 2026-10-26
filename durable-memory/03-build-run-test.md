@@ -1,5 +1,5 @@
-# Build, run, and test
+# Build and verification
 
-Install the released CLI with `npm install -g @lmctl-ai/lmctl@0.2.347`, then run `bash test.sh`. The script builds the native host, compiles a DSL chunk, runs it against the schema, and checks success and error paths.
+`bash test.sh` verifies pinned SDK/dependencies, builds the native host, checks exact version/schema/notices/signatures, audits Linux linkage, compiles and runs four DSL test programs (including the tool-stream path), runs 28 native regression scenarios, regenerates 32 examples and images where sibling renderers are available, checks secret-looking artifacts, and exercises the default memory budget under a 6 GiB virtual-memory ceiling.
 
-For embedding, copy the SDK header or add the Rust crate from the public SDK repository, keep the schema bytes alongside the bytecode, and use the matching SDK major version.
+The local gate is authoritative for this initial release. Linux x86_64 is tested directly. macOS and Windows currently return explicit unsupported stubs. No live credentials are required by the gate.

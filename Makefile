@@ -1,18 +1,11 @@
-CXX ?= g++
-CXXFLAGS ?= -std=c++17 -O1 -Wall -Wextra -pedantic
-BUILD ?= build
-# TLS only when the OpenSSL development files are present (no new system packages are installed by this POC).
-HAVE_SSL := $(shell test -f /usr/include/openssl/ssl.h && (test -f /usr/lib/x86_64-linux-gnu/libssl.so || test -f /usr/lib/libssl.so) && echo yes)
-ifeq ($(HAVE_SSL),yes)
-TLSFLAGS := -DHAVE_OPENSSL
-TLSLIBS := -lssl -lcrypto
-endif
-
-$(BUILD)/curlhost: cpp/curlhost.cpp cpp/http.hpp cpp/dslvm.hpp
-	@mkdir -p $(BUILD)
-	$(CXX) $(CXXFLAGS) $(TLSFLAGS) -o $@ cpp/curlhost.cpp $(TLSLIBS)
-
+BUILD_DIR ?= build
+.PHONY: all test clean
+all:
+	@if [ "$$(uname -s)" = Linux ]; then scripts/sync-deps.sh; fi
+	@scripts/sync-sdk.sh --verify
+	cmake -S . -B $(BUILD_DIR) -DCMAKE_BUILD_TYPE=Release
+	cmake --build $(BUILD_DIR) --parallel 2
+test: all
+	BUILD_DIR=$(BUILD_DIR) bash test.sh
 clean:
-	rm -rf $(BUILD)
-
-.PHONY: clean
+	cmake --build $(BUILD_DIR) --target clean

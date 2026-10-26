@@ -1,0 +1,31 @@
+mkdir("data"); mkdir("images"); mkdir("reports"); mkdir("build/examples"); mkdir("docs/images");
+write_file("data/cases.json", "[{\"id\":1},{\"id\":2},{\"id\":3},{\"id\":4}]");
+p = _dsl_ cli="lmcurl" install="github:lmctl-ai/lmcurl@latest";
+let m=curl.mock();
+let s=curl.session(m.url());
+let suite=curl.suite("JSON cases").data_json("data/cases.json");suite.test_request("echo",s.get("/echo?id={{id}}")).expect_status(200).expect_json("$.args.id","{{id}}");let report=suite.report();assert_eq(report.passed(),4);
+let csv="metric,value\n";
+csv=csv+"JSON rows,"+str(report.passed())+"\n";
+csv=csv+"failed rows,"+str(report.failed())+"\n";
+file_write("data/json_cases.csv",csv);
+m.stop();
+end _dsl_
+savedsl(p,"build/examples/json_cases.dslb");
+r = system ${dsl_cli(p)} --dsl build/examples/json_cases.dslb;
+if(r.code != 0){println(r.stdout);println(r.stderr);}
+assert(r.code==0);
+plot = _dsl_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+plot.png("images/json_cases.png",900,560);
+plot.cmd("set datafile separator ','");
+plot.cmd("set title \"JSON data drives a reusable request\"");
+plot.cmd("set yrange [0:*]; set offsets 0,0,graph 0.12,0; set grid y; unset key; set style fill solid 0.85; set boxwidth 0.65");
+plot.cmd("set xtics rotate by -15 font ',10'");
+plot.cmd("set ylabel \"observed value\"");
+plot.cmd("plot 'data/json_cases.csv' every ::1 using 0:2:xtic(1) with boxes lc rgb '#0969da', '' every ::1 using 0:2:(sprintf('%.3g',$2)) with labels offset 0,0.8");
+plot.close();
+end _dsl_
+savedsl(plot,"build/examples/json_cases-plot.dslb");
+r = system ${dsl_cli(plot)} --dsl build/examples/json_cases-plot.dslb;
+assert(r.code==0);
+assert(copy_file("images/json_cases.png","docs/images/json_cases.png"));
+println("images/json_cases.png");

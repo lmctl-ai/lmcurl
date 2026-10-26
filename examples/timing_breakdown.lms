@@ -1,0 +1,34 @@
+mkdir("data"); mkdir("images"); mkdir("reports"); mkdir("build/examples"); mkdir("docs/images");
+
+p = _dsl_ cli="lmcurl" install="github:lmctl-ai/lmcurl@latest";
+let m=curl.mock();
+let s=curl.session(m.url());
+let r=s.get("/delay/40").send();assert_eq(r.status(),200);assert(r.time("total")>=r.time("ttfb"));assert(r.time("total")>=30.0);
+let csv="metric,value\n";
+csv=csv+"DNS ms,"+str(r.time("dns"))+"\n";
+csv=csv+"connect ms,"+str(r.time("connect"))+"\n";
+csv=csv+"TLS ms,"+str(r.time("tls"))+"\n";
+csv=csv+"first byte ms,"+str(r.time("ttfb"))+"\n";
+csv=csv+"total ms,"+str(r.time("total"))+"\n";
+file_write("data/timing_breakdown.csv",csv);
+m.stop();
+end _dsl_
+savedsl(p,"build/examples/timing_breakdown.dslb");
+r = system ${dsl_cli(p)} --dsl build/examples/timing_breakdown.dslb;
+if(r.code != 0){println(r.stdout);println(r.stderr);}
+assert(r.code==0);
+plot = _dsl_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+plot.png("images/timing_breakdown.png",900,560);
+plot.cmd("set datafile separator ','");
+plot.cmd("set title \"Where a delayed response spends its time\"");
+plot.cmd("set yrange [0:*]; set offsets 0,0,graph 0.12,0; set grid y; unset key; set style fill solid 0.85; set boxwidth 0.65");
+plot.cmd("set xtics rotate by -15 font ',10'");
+plot.cmd("set ylabel \"observed value\"");
+plot.cmd("plot 'data/timing_breakdown.csv' every ::1 using 0:2:xtic(1) with boxes lc rgb '#0969da', '' every ::1 using 0:2:(sprintf('%.3g',$2)) with labels offset 0,0.8");
+plot.close();
+end _dsl_
+savedsl(plot,"build/examples/timing_breakdown-plot.dslb");
+r = system ${dsl_cli(plot)} --dsl build/examples/timing_breakdown-plot.dslb;
+assert(r.code==0);
+assert(copy_file("images/timing_breakdown.png","docs/images/timing_breakdown.png"));
+println("images/timing_breakdown.png");

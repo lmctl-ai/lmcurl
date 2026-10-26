@@ -1,0 +1,120 @@
+name: ci
+
+on:
+  workflow_dispatch:
+    inputs:
+      only:
+        description: Run one platform or all five
+        required: true
+        default: all
+        type: choice
+        options: [all, linux-x64, linux-arm64, macos-arm64, macos-x64, windows-x64]
+  push:
+    branches: [main]
+    tags: ["v*"]
+    paths-ignore: ["durable-memory/**", "**.md"]
+  pull_request:
+    paths-ignore: ["durable-memory/**", "**.md"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lmcurl-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  build:
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-22.04, name: linux-x64}
+          - {os: ubuntu-22.04-arm, name: linux-arm64}
+          - {os: macos-15, name: macos-arm64}
+          - {os: macos-15-intel, name: macos-x64}
+          - {os: windows-2022, name: windows-x64}
+    runs-on: ${{ matrix.os }}
+    name: ${{ matrix.name }}
+    env:
+      ONLY_OK: ${{ github.event_name != 'workflow_dispatch' || inputs.only == 'all' || inputs.only == matrix.name }}
+      LMCURL_LIVE: "0"
+      CI: "true"
+      PYTHONUTF8: "1"
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        if: env.ONLY_OK == 'true'
+        with:
+          persist-credentials: false
+      - name: Linux toolchain and pinned dependencies
+        if: runner.os == 'Linux' && env.ONLY_OK == 'true'
+        run: |
+          timeout 180 sudo apt-get update -qq
+          timeout 180 sudo apt-get install -y -qq ninja-build perl
+          timeout 600 scripts/sync-deps.sh
+          timeout 60 scripts/sync-sdk.sh --verify
+      - name: CMake tools (macOS)
+        if: runner.os == 'macOS' && env.ONLY_OK == 'true'
+        run: brew install ninja coreutils
+      - name: Windows tools
+        if: runner.os == 'Windows' && env.ONLY_OK == 'true'
+        run: |
+          for i in 1 2 3; do
+            command -v g++ >/dev/null 2>&1 && command -v ninja >/dev/null 2>&1 && break
+            choco install -y mingw ninja && break || sleep 15
+          done
+          command -v g++ >/dev/null 2>&1 || exit 1
+          command -v ninja >/dev/null 2>&1 || exit 1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        if: env.ONLY_OK == 'true'
+        with:
+          node-version: 24
+      - name: Install pinned lmscript compiler
+        if: env.ONLY_OK == 'true'
+        run: timeout 180 npm install -g @lmctl-ai/lmctl@0.2.420
+      - name: Build and test
+        if: env.ONLY_OK == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: timeout 1800 ./test.sh
+      - name: Package tested executable
+        if: env.ONLY_OK == 'true'
+        run: |
+          mkdir -p dist
+          suffix=""; [ "$RUNNER_OS" = Windows ] && suffix=.exe
+          cp "build/lmcurl${suffix}" "dist/lmcurl-${{ matrix.name }}${suffix}"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: env.ONLY_OK == 'true'
+        with:
+          name: lmcurl-${{ matrix.name }}
+          path: dist/
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: lmcurl-*
+          path: dist
+          merge-multiple: true
+      - name: Check five release assets and checksums
+        run: |
+          test "$(find dist -maxdepth 1 -type f -name 'lmcurl-*' | wc -l)" -eq 5
+          (cd dist && sha256sum lmcurl-* > SHA256SUMS)
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/lmcurl-* dist/SHA256SUMS \
+            --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" \
+            --notes "Five tested platform binaries. Linux dynamically links system glibc; macOS and Windows use the documented stub until native TLS packaging is enabled. Licenses: lmcurl --notices."

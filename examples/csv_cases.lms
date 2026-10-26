@@ -1,0 +1,31 @@
+mkdir("data"); mkdir("images"); mkdir("reports"); mkdir("build/examples"); mkdir("docs/images");
+write_file("data/cases.csv", "id\na\nb\nc\n");
+p = _dsl_ cli="lmcurl" install="github:lmctl-ai/lmcurl@latest";
+let m=curl.mock();
+let s=curl.session(m.url());
+let suite=curl.suite("CSV cases").data_csv("data/cases.csv");suite.test_request("echo row",s.get("/echo?id={{id}}")).expect_status(200).expect_json("$.args.id","{{id}}");let report=suite.report();assert_eq(report.passed(),3);assert_eq(report.failed(),0);
+let csv="metric,value\n";
+csv=csv+"rows passed,"+str(report.passed())+"\n";
+csv=csv+"rows failed,"+str(report.failed())+"\n";
+file_write("data/csv_cases.csv",csv);
+m.stop();
+end _dsl_
+savedsl(p,"build/examples/csv_cases.dslb");
+r = system ${dsl_cli(p)} --dsl build/examples/csv_cases.dslb;
+if(r.code != 0){println(r.stdout);println(r.stderr);}
+assert(r.code==0);
+plot = _dsl_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+plot.png("images/csv_cases.png",900,560);
+plot.cmd("set datafile separator ','");
+plot.cmd("set title \"Three CSV rows exercise one request template\"");
+plot.cmd("set yrange [0:*]; set offsets 0,0,graph 0.12,0; set grid y; unset key; set style fill solid 0.85; set boxwidth 0.65");
+plot.cmd("set xtics rotate by -15 font ',10'");
+plot.cmd("set ylabel \"observed value\"");
+plot.cmd("plot 'data/csv_cases.csv' every ::1 using 0:2:xtic(1) with boxes lc rgb '#0969da', '' every ::1 using 0:2:(sprintf('%.3g',$2)) with labels offset 0,0.8");
+plot.close();
+end _dsl_
+savedsl(plot,"build/examples/csv_cases-plot.dslb");
+r = system ${dsl_cli(plot)} --dsl build/examples/csv_cases-plot.dslb;
+assert(r.code==0);
+assert(copy_file("images/csv_cases.png","docs/images/csv_cases.png"));
+println("images/csv_cases.png");

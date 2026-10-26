@@ -5,7 +5,9 @@ root=Path(__file__).resolve().parents[1]
 host=sys.argv[1] if len(sys.argv)>1 else str(root/'build/lmcurl')
 types,functions,context={},{},{}
 pattern=re.compile(r'^(?:fn (\w+)|method (\w+)\.(\w+))\((.*?)\) -> (\w+)$')
-for line in subprocess.check_output([host,'--dsl-signatures'],text=True,timeout=30).splitlines():
+signatures=subprocess.check_output([host,'--dsl-signatures'],text=True,timeout=30)
+(root/'schema/lmcurl.signatures.txt').write_text(signatures)
+for line in signatures.splitlines():
  if line.startswith('context '):name,typ=line[8:].split(': ');context[name]=typ;continue
  m=pattern.fullmatch(line)
  if not m:raise SystemExit('invalid registry signature')

@@ -1,0 +1,46 @@
+mkdir("data"); mkdir("images"); mkdir("reports"); mkdir("build/examples"); mkdir("docs/images");
+
+p = _dsl_ cli="lmcurl" install="github:lmctl-ai/lmcurl@latest";
+let m=curl.mock();
+let s=curl.session(m.url());
+let suite=curl.suite("login capture");
+suite.test_request("login",s.post("/login").json("{\"username\":\"demo\",\"password\":\"demo\"}")).expect_status(200).capture_secret("token","$.token");
+suite.test_request("protected",s.get("/protected").header("Authorization","Bearer {{token}}")).expect_status(200).expect_json("$.authorized","true");
+let report=suite.report();assert_eq(report.failed(),0);
+let csv="metric,value\n";
+csv=csv+"passed checks,"+str(report.passed())+"\n";
+csv=csv+"failed checks,"+str(report.failed())+"\n";
+file_write("data/login_session.csv",csv);
+m.stop();
+end _dsl_
+savedsl(p,"build/examples/login_session.dslb");
+r = system ${dsl_cli(p)} --dsl build/examples/login_session.dslb;
+if(r.code != 0){println(r.stdout);println(r.stderr);}
+assert(r.code==0);
+draw = _dsl_ cli="lmdraw" install="github:lmctl-ai/lmdraw@latest";
+scene.canvas(900,560,"#0d1726");
+scene.text(48.0,58.0,26.0,"Login, capture, then protected request","#edf5ff");
+scene.text(48.0,91.0,15.0,"Two real mock-server requests; assertions must pass before rendering","#a9bdd5");
+let a=scene.rect(70.0,150.0,310.0,110.0,"#17344c");a.set_attr("rx","12");
+scene.text(92.0,188.0,21.0,"POST /login","#ffffff");
+scene.text(92.0,220.0,16.0,"demo credentials -> HTTP 200","#b6e3ff");
+let b=scene.rect(520.0,150.0,310.0,110.0,"#17344c");b.set_attr("rx","12");
+scene.text(542.0,188.0,21.0,"Capture $.token","#ffffff");
+scene.text(542.0,220.0,16.0,"Register as a secret variable","#b6e3ff");
+let c=scene.rect(520.0,360.0,310.0,110.0,"#17344c");c.set_attr("rx","12");
+scene.text(542.0,398.0,21.0,"GET /protected","#ffffff");
+scene.text(542.0,430.0,16.0,"Bearer {{token}} + session cookie","#b6e3ff");
+let d=scene.rect(70.0,360.0,310.0,110.0,"#174638");d.set_attr("rx","12");
+scene.text(92.0,398.0,21.0,"Assert authorized = true","#ffffff");
+scene.text(92.0,430.0,16.0,"Report: two passed, zero failed","#aff2ce");
+let e1=scene.line(390.0,205.0,505.0,205.0,"#79c0ff",3.0);e1.set_attr("marker-end","arrow");
+let e2=scene.line(675.0,272.0,675.0,344.0,"#79c0ff",3.0);e2.set_attr("marker-end","arrow");
+let e3=scene.line(507.0,415.0,395.0,415.0,"#79c0ff",3.0);e3.set_attr("marker-end","arrow");
+scene.text(48.0,520.0,14.0,"Fixture secrets are redacted from exported artifacts. No cloud credentials required.","#a9bdd5");
+scene.render_png("images/login_session.png",900,560,1);
+end _dsl_
+savedsl(draw,"build/examples/login_session-draw.dslb");
+r = system ${dsl_cli(draw)} --dsl build/examples/login_session-draw.dslb;
+assert(r.code==0);
+assert(copy_file("images/login_session.png","docs/images/login_session.png"));
+println("images/login_session.png");

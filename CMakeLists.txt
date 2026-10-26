@@ -18,6 +18,8 @@ if(APPLE OR WIN32)
   endfunction()
   stub_embed("${CMAKE_SOURCE_DIR}/schema/lmcurl.dsl.json" "${STUB_GEN}/schema_embedded.hpp" embedded_schema)
   stub_embed("${CMAKE_SOURCE_DIR}/THIRD_PARTY_NOTICES" "${STUB_GEN}/notices_embedded.hpp" embedded_notices)
+  stub_embed("${CMAKE_SOURCE_DIR}/schema/lmcurl.signatures.txt" "${STUB_GEN}/signatures_embedded.hpp" embedded_signatures)
+  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
   add_executable(lmcurl cpp/stub.cpp "${STUB_GEN}/schema_embedded.hpp" "${STUB_GEN}/notices_embedded.hpp")
   target_include_directories(lmcurl PRIVATE "${STUB_GEN}")
   target_compile_definitions(lmcurl PRIVATE LMCURL_VERSION="${PROJECT_VERSION}")
@@ -42,11 +44,11 @@ if(NOT APPLE AND NOT WIN32)
   endif()
   set(OPENSSL_PREFIX "${CMAKE_BINARY_DIR}/deps/openssl")
   if(NOT EXISTS "${OPENSSL_PREFIX}/lib64/libssl.a")
-    file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/deps")
+    file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/deps/openssl-build")
     execute_process(COMMAND "${PERL_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/third_party/openssl/Configure"
       ${OPENSSL_TARGET} no-shared no-module no-dso no-tests --prefix=${OPENSSL_PREFIX} --openssldir=/etc/ssl
-      WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/third_party/openssl"
-      RESULT_VARIABLE OPENSSL_CONFIGURE_RESULT)
+      WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/deps/openssl-build"
+      RESULT_VARIABLE OPENSSL_CONFIGURE_RESULT TIMEOUT 120 OUTPUT_FILE "${CMAKE_BINARY_DIR}/openssl-configure.log" ERROR_FILE "${CMAKE_BINARY_DIR}/openssl-configure-errors.log")
     if(NOT OPENSSL_CONFIGURE_RESULT EQUAL 0)
       message(FATAL_ERROR "vendored OpenSSL Configure failed (${OPENSSL_CONFIGURE_RESULT})")
     endif()
@@ -54,8 +56,8 @@ if(NOT APPLE AND NOT WIN32)
     # make on some toolchains; use one job for this sub-build while the rest of
     # lmcurl remains capped at two compiler jobs.
     execute_process(COMMAND "${MAKE_EXECUTABLE}" -j1 build_sw install_sw
-      WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/third_party/openssl"
-      RESULT_VARIABLE OPENSSL_BUILD_RESULT)
+      WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/deps/openssl-build"
+      RESULT_VARIABLE OPENSSL_BUILD_RESULT TIMEOUT 1800 OUTPUT_FILE "${CMAKE_BINARY_DIR}/openssl-build.log" ERROR_FILE "${CMAKE_BINARY_DIR}/openssl-build-errors.log")
     if(NOT OPENSSL_BUILD_RESULT EQUAL 0)
       message(FATAL_ERROR "vendored OpenSSL static build failed (${OPENSSL_BUILD_RESULT})")
     endif()
@@ -96,7 +98,8 @@ if(NOT APPLE AND NOT WIN32)
   set(LIBXML2_WITH_ICONV OFF CACHE BOOL "" FORCE)
   set(LIBXML2_WITH_ZLIB OFF CACHE BOOL "" FORCE)
   set(LIBXML2_WITH_LZMA OFF CACHE BOOL "" FORCE)
-  set(LIBXML2_WITH_PYTHON OFF CACHE BOOL "" FORCE)
+  set(LIBXML2_WITH_MODULES OFF CACHE BOOL "" FORCE)
+set(LIBXML2_WITH_PYTHON OFF CACHE BOOL "" FORCE)
   set(LIBXML2_WITH_PROGRAMS OFF CACHE BOOL "" FORCE)
   set(LIBXML2_WITH_TESTS OFF CACHE BOOL "" FORCE)
   set(LIBXML2_WITH_HTML ON CACHE BOOL "" FORCE)

@@ -1,0 +1,31 @@
+mkdir("data"); mkdir("images"); mkdir("reports"); mkdir("build/examples"); mkdir("docs/images");
+
+p = _dsl_ cli="lmcurl" install="github:lmctl-ai/lmcurl@latest";
+let m=curl.mock();
+let s=curl.session(m.url());
+let r=s.get("/json").send();let spec="{\"openapi\": \"3.0.3\", \"paths\": {\"/json\": {\"get\": {\"responses\": {\"200\": {\"content\": {\"application/json\": {\"schema\": {\"type\": \"object\", \"required\": [\"ok\", \"items\"]}}}}}}}}}";assert_eq(r.assert_openapi(spec,"/json","GET"),true);assert_eq(r.assert_openapi(spec,"/missing","GET"),false);let accepted=1;let rejected=1;
+let csv="metric,value\n";
+csv=csv+"matching route,"+str(accepted)+"\n";
+csv=csv+"unknown route rejected,"+str(rejected)+"\n";
+file_write("data/openapi_contract.csv",csv);
+m.stop();
+end _dsl_
+savedsl(p,"build/examples/openapi_contract.dslb");
+r = system ${dsl_cli(p)} --dsl build/examples/openapi_contract.dslb;
+if(r.code != 0){println(r.stdout);println(r.stderr);}
+assert(r.code==0);
+plot = _dsl_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+plot.png("images/openapi_contract.png",900,560);
+plot.cmd("set datafile separator ','");
+plot.cmd("set title \"Check a JSON OpenAPI response contract\"");
+plot.cmd("set yrange [0:*]; set offsets 0,0,graph 0.12,0; set grid y; unset key; set style fill solid 0.85; set boxwidth 0.65");
+plot.cmd("set xtics rotate by -15 font ',10'");
+plot.cmd("set ylabel \"observed value\"");
+plot.cmd("plot 'data/openapi_contract.csv' every ::1 using 0:2:xtic(1) with boxes lc rgb '#0969da', '' every ::1 using 0:2:(sprintf('%.3g',$2)) with labels offset 0,0.8");
+plot.close();
+end _dsl_
+savedsl(plot,"build/examples/openapi_contract-plot.dslb");
+r = system ${dsl_cli(plot)} --dsl build/examples/openapi_contract-plot.dslb;
+assert(r.code==0);
+assert(copy_file("images/openapi_contract.png","docs/images/openapi_contract.png"));
+println("images/openapi_contract.png");

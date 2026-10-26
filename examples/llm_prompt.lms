@@ -1,0 +1,32 @@
+mkdir("data"); mkdir("images"); mkdir("reports"); mkdir("build/examples"); mkdir("docs/images");
+
+p = _dsl_ cli="lmcurl" install="github:lmctl-ai/lmcurl@latest";
+let m=curl.mock();
+let s=curl.session(m.url());
+let result=llm.mock("fixture-model").chat("ping").max_tokens(8).send();assert_eq(result.equals("pong"),true);assert_eq(result.not_contains("error"),true);
+let csv="metric,value\n";
+csv=csv+"input fixture tokens,"+str(result.input_tokens())+"\n";
+csv=csv+"output fixture tokens,"+str(result.output_tokens())+"\n";
+csv=csv+"output bytes,"+str(result.length())+"\n";
+file_write("data/llm_prompt.csv",csv);
+m.stop();
+end _dsl_
+savedsl(p,"build/examples/llm_prompt.dslb");
+r = system ${dsl_cli(p)} --dsl build/examples/llm_prompt.dslb;
+if(r.code != 0){println(r.stdout);println(r.stderr);}
+assert(r.code==0);
+plot = _dsl_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+plot.png("images/llm_prompt.png",900,560);
+plot.cmd("set datafile separator ','");
+plot.cmd("set title \"A prompt regression is an ordinary assertion\"");
+plot.cmd("set yrange [0:*]; set offsets 0,0,graph 0.12,0; set grid y; unset key; set style fill solid 0.85; set boxwidth 0.65");
+plot.cmd("set xtics rotate by -15 font ',10'");
+plot.cmd("set ylabel \"observed value\"");
+plot.cmd("plot 'data/llm_prompt.csv' every ::1 using 0:2:xtic(1) with boxes lc rgb '#0969da', '' every ::1 using 0:2:(sprintf('%.3g',$2)) with labels offset 0,0.8");
+plot.close();
+end _dsl_
+savedsl(plot,"build/examples/llm_prompt-plot.dslb");
+r = system ${dsl_cli(plot)} --dsl build/examples/llm_prompt-plot.dslb;
+assert(r.code==0);
+assert(copy_file("images/llm_prompt.png","docs/images/llm_prompt.png"));
+println("images/llm_prompt.png");

@@ -1,0 +1,11 @@
+p = _dsl_ cli="lmcurl" install="github:lmctl-ai/lmcurl@latest";
+let mock = curl.mock();
+let provider = llm.provider("mock", mock.url(), "tool-stream-fixture");
+let result = provider.chat("lookup Paris").stream(true).send();
+assert_eq(result.status(), 200);
+assert_eq(result.tools(), "[{\"function\":{\"arguments\":\"{\\\"city\\\":\\\"Paris\\\"}\",\"name\":\"lookup\"},\"id\":\"call_1\",\"type\":\"function\"}]");
+mock.stop();
+end _dsl_
+savedsl(p, "build/tests/tool-stream.dslb");
+r = system ${dsl_cli(p)} --dsl build/tests/tool-stream.dslb;
+assert(r.code == 0);

@@ -1,0 +1,31 @@
+mkdir("data"); mkdir("images"); mkdir("reports"); mkdir("build/examples"); mkdir("docs/images");
+
+p = _dsl_ cli="lmcurl" install="github:lmctl-ai/lmcurl@latest";
+let m=curl.mock();
+let s=curl.session(m.url());
+let r=s.get("/xml").send();assert_eq(r.xpath("string(/catalog/item[1])").value(),"alpha");let count=r.xpath("count(/catalog/item)").value();assert_eq(curl.query_text(count).gt("1"),true);
+let csv="metric,value\n";
+csv=csv+"catalog items,"+str(str_to_float(count))+"\n";
+csv=csv+"HTTP status,"+str(r.status())+"\n";
+file_write("data/xml_catalog.csv",csv);
+m.stop();
+end _dsl_
+savedsl(p,"build/examples/xml_catalog.dslb");
+r = system ${dsl_cli(p)} --dsl build/examples/xml_catalog.dslb;
+if(r.code != 0){println(r.stdout);println(r.stderr);}
+assert(r.code==0);
+plot = _dsl_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+plot.png("images/xml_catalog.png",900,560);
+plot.cmd("set datafile separator ','");
+plot.cmd("set title \"XPath checks on an XML catalog\"");
+plot.cmd("set yrange [0:*]; set offsets 0,0,graph 0.12,0; set grid y; unset key; set style fill solid 0.85; set boxwidth 0.65");
+plot.cmd("set xtics rotate by -15 font ',10'");
+plot.cmd("set ylabel \"observed value\"");
+plot.cmd("plot 'data/xml_catalog.csv' every ::1 using 0:2:xtic(1) with boxes lc rgb '#0969da', '' every ::1 using 0:2:(sprintf('%.3g',$2)) with labels offset 0,0.8");
+plot.close();
+end _dsl_
+savedsl(plot,"build/examples/xml_catalog-plot.dslb");
+r = system ${dsl_cli(plot)} --dsl build/examples/xml_catalog-plot.dslb;
+assert(r.code==0);
+assert(copy_file("images/xml_catalog.png","docs/images/xml_catalog.png"));
+println("images/xml_catalog.png");

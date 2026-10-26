@@ -1,0 +1,32 @@
+mkdir("data"); mkdir("images"); mkdir("reports"); mkdir("build/examples"); mkdir("docs/images");
+
+p = _dsl_ cli="lmcurl" install="github:lmctl-ai/lmcurl@latest";
+let m=curl.mock();
+let s=curl.session(m.url());
+let held=s.get("/redirect/3").follow(false).send();let followed=s.get("/redirect/3").send();
+assert_eq(held.status(),302);assert_eq(followed.status(),200);assert_eq(followed.json("$.redirected").value(),"true");
+let csv="metric,value\n";
+csv=csv+"without follow,"+str(held.status())+"\n";
+csv=csv+"followed status,"+str(followed.status())+"\n";
+file_write("data/redirect_chain.csv",csv);
+m.stop();
+end _dsl_
+savedsl(p,"build/examples/redirect_chain.dslb");
+r = system ${dsl_cli(p)} --dsl build/examples/redirect_chain.dslb;
+if(r.code != 0){println(r.stdout);println(r.stderr);}
+assert(r.code==0);
+plot = _dsl_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+plot.png("images/redirect_chain.png",900,560);
+plot.cmd("set datafile separator ','");
+plot.cmd("set title \"Following a bounded redirect chain\"");
+plot.cmd("set yrange [0:*]; set offsets 0,0,graph 0.12,0; set grid y; unset key; set style fill solid 0.85; set boxwidth 0.65");
+plot.cmd("set xtics rotate by -15 font ',10'");
+plot.cmd("set ylabel \"observed value\"");
+plot.cmd("plot 'data/redirect_chain.csv' every ::1 using 0:2:xtic(1) with boxes lc rgb '#0969da', '' every ::1 using 0:2:(sprintf('%.3g',$2)) with labels offset 0,0.8");
+plot.close();
+end _dsl_
+savedsl(plot,"build/examples/redirect_chain-plot.dslb");
+r = system ${dsl_cli(plot)} --dsl build/examples/redirect_chain-plot.dslb;
+assert(r.code==0);
+assert(copy_file("images/redirect_chain.png","docs/images/redirect_chain.png"));
+println("images/redirect_chain.png");

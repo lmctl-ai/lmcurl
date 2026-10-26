@@ -12,6 +12,7 @@ fetch_one() {
     timeout 300 curl --fail --location --retry 3 --retry-delay 2 "$url" -o "$tarball"
   fi
   [[ "$(sha256 "$tarball")" == "$want" ]] || { echo "$name archive hash mismatch" >&2; exit 1; }
+  if [[ -f "$DEST/$dir/.lmcurl-archive-sha256" && "$(cat "$DEST/$dir/.lmcurl-archive-sha256")" == "$want" ]]; then return; fi
   rm -rf "$DEST/$dir"
   mkdir -p "$DEST/$dir"
   tar -xf "$tarball" -C "$DEST/$dir" --strip-components=1
@@ -29,6 +30,7 @@ if [[ "${1:-}" == "--verify" ]]; then
     'libxml2 libxml2-2.15.4.tar.xz libxml2'; do
     read -r name archive dir <<<"$spec"
     [[ -f "$DEST/$dir/.lmcurl-archive-sha256" ]] || { echo "$name missing; run scripts/sync-deps.sh" >&2; exit 1; }
+    [[ -f "$DEST/.$archive" && "$(sha256 "$DEST/.$archive")" == "$(get "$name" sha256)" ]] || { echo "$name cached archive differs from deps.lock" >&2; exit 1; }
     [[ "$(cat "$DEST/$dir/.lmcurl-archive-sha256")" == "$(get "$name" sha256)" ]] || { echo "$name pin mismatch" >&2; exit 1; }
   done
   echo "lmcurl third-party archives match deps.lock"

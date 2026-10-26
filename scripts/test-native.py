@@ -41,4 +41,38 @@ with tempfile.TemporaryDirectory(prefix='lmcurl-native-') as td:
  run('let m=curl.mock();let r=curl.session(m.url()).get("/gzip").send();assert_eq(r.json("$.compressed").value(),"true");m.stop();')
  r=run('let s=curl.session("http://127.0.0.1:1");for(i in range(0,100000)){s.get("/").body(str_repeat("x",1000000));}',3,{'LMCURL_MAX_MEMORY_MB':'64'})
  assert 'LMCURL_MAX_MEMORY_MB' in r.stderr and 'memory budget exceeded' in r.stderr
+ # Local servers keep all redirect regressions offline, even when guarding provider names.
+ import http.server, threading
+ class RedirectHandler(http.server.BaseHTTPRequestHandler):
+  def do_POST(self): self.do_GET()
+  def do_GET(self):
+   if self.path=='/paid':
+    self.send_response(307);self.send_header('Location','http://api.deepseek.com:1/chat/completions');self.end_headers()
+   elif self.path=='/cross':
+    self.send_response(307);self.send_header('Location',dest+'/echo');self.end_headers()
+   elif self.path=='/literal':
+    self.send_response(302);self.send_header('Location','/echo?value={{not_a_variable}}');self.end_headers()
+   elif self.path=='/loop':
+    self.send_response(307);self.send_header('Location','/loop');self.end_headers()
+   else:
+    data=json.dumps(dict(self.headers)).encode();self.send_response(200);self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data)
+  def log_message(self,*args): pass
+ servers=[http.server.ThreadingHTTPServer(('127.0.0.1',0),RedirectHandler) for _ in range(2)]
+ for server in servers: threading.Thread(target=server.serve_forever,daemon=True).start()
+ origin='http://127.0.0.1:'+str(servers[0].server_port);dest='http://127.0.0.1:'+str(servers[1].server_port)
+ try:
+  r=run('curl.session('+json.dumps(origin)+').post("/paid").resolve("api.deepseek.com:1:127.0.0.1").send();',3)
+  assert 'cost-controlled' in r.stderr
+  run('let r=curl.session('+json.dumps(origin)+').header("Authorization","Bearer fixture-cross-origin").post("/cross").send();assert_eq(r.json("$.Authorization").exists(),false);')
+  run('assert_eq(curl.session('+json.dumps(origin)+').get("/literal").send().status(),200);')
+  r=run('curl.session('+json.dumps(origin)+').get("/loop").send();',3);assert 'redirect limit' in r.stderr
+ finally:
+  for server in servers:server.shutdown();server.server_close()
+ deep='['*140+'0'+']'*140
+ (work/'deep.json').write_text(deep)
+ r=run('llm.mock("fixture").chat("ping").tool("deep",file_read("deep.json"));',3)
+ assert 'nesting exceeds 128' in r.stderr
+ run('llm.mock("fixture").chat("ping").send().matches(str_repeat("x",257));',3)
+ run('assert_eq(curl.query_text(str_repeat("a",8000)+"!").matches("^(a+)+$"),false);')
+ run('llm.mock("fixture").chat("ping").send().matches("[");',3)
 print('PASS native HTTP/framework/LLM safety: '+str(passed)+' cases')

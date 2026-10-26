@@ -42,6 +42,18 @@ std::size_t clamp(std::int64_t v) { return v < 0 ? 0 : std::size_t(v); }
   throw e;
 }
 
+bool try_reserve(std::size_t request) {
+  auto now = g_used.load(std::memory_order_relaxed);
+  for (;;) {
+    const auto lim = g_limit.load(std::memory_order_relaxed);
+    if (request > lim || now > lim - request)
+      return false;
+    if (g_used.compare_exchange_weak(now, now + request, std::memory_order_relaxed,
+                                     std::memory_order_relaxed))
+      return true;
+  }
+}
+
 void check(std::size_t request) {
   const std::size_t now = clamp(g_used.load(std::memory_order_relaxed));
   const std::size_t lim = g_limit.load(std::memory_order_relaxed);
@@ -59,10 +71,23 @@ std::size_t block_size(void *p) {
 }
 
 void *plain_alloc(std::size_t n) {
-  check(n);
-  void *p = std::malloc(n ? n : 1);
-  if (!p) return nullptr;
-  g_used.fetch_add(std::int64_t(block_size(p)), std::memory_order_relaxed);
+  n = n ? n : 1;
+  if (!try_reserve(n)) trip(n);
+  void *p = std::malloc(n);
+  if (!p) {
+    g_used.fetch_sub(std::int64_t(n), std::memory_order_relaxed);
+    return nullptr;
+  }
+  const auto actual = block_size(p);
+  if (actual > n) {
+    if (!try_reserve(actual - n)) {
+      g_used.fetch_sub(std::int64_t(n), std::memory_order_relaxed);
+      std::free(p);
+      trip(actual);
+    }
+  } else if (actual < n) {
+    g_used.fetch_sub(std::int64_t(n - actual), std::memory_order_relaxed);
+  }
   return p;
 }
 
@@ -75,22 +100,48 @@ void plain_free(void *p) {
 // Windows: _aligned_msize is missing from older msvcrt, so over-allocate with malloc and keep the
 // raw pointer in front of the aligned block (libstdc++ is static there; nothing else frees it).
 void *aligned_alloc_counted(std::size_t n, std::size_t align) {
-  check(n);
   if (n == 0) n = 1;
   if (align < sizeof(void *)) align = sizeof(void *);
 #if defined(_WIN32)
   if (n > SIZE_MAX - align - sizeof(void *)) return nullptr;
-  void *raw = std::malloc(n + align + sizeof(void *));
-  if (!raw) return nullptr;
+  const auto requested = n + align + sizeof(void *);
+  if (!try_reserve(requested)) trip(requested);
+  void *raw = std::malloc(requested);
+  if (!raw) {
+    g_used.fetch_sub(std::int64_t(requested), std::memory_order_relaxed);
+    return nullptr;
+  }
   std::uintptr_t start = reinterpret_cast<std::uintptr_t>(raw) + sizeof(void *);
   void *p = reinterpret_cast<void *>((start + align - 1) & ~std::uintptr_t(align - 1));
   static_cast<void **>(p)[-1] = raw;
-  g_used.fetch_add(std::int64_t(block_size(raw)), std::memory_order_relaxed);
+  const auto actual = block_size(raw);
+  if (actual > requested) {
+    if (!try_reserve(actual - requested)) {
+      g_used.fetch_sub(std::int64_t(requested), std::memory_order_relaxed);
+      std::free(raw);
+      trip(actual);
+    }
+  } else if (actual < requested) {
+    g_used.fetch_sub(std::int64_t(requested - actual), std::memory_order_relaxed);
+  }
   return p;
 #else
+  if (!try_reserve(n)) trip(n);
   void *p = nullptr;
-  if (posix_memalign(&p, align, n) != 0) return nullptr;
-  g_used.fetch_add(std::int64_t(block_size(p)), std::memory_order_relaxed);
+  if (posix_memalign(&p, align, n) != 0) {
+    g_used.fetch_sub(std::int64_t(n), std::memory_order_relaxed);
+    return nullptr;
+  }
+  const auto actual = block_size(p);
+  if (actual > n) {
+    if (!try_reserve(actual - n)) {
+      g_used.fetch_sub(std::int64_t(n), std::memory_order_relaxed);
+      std::free(p);
+      trip(actual);
+    }
+  } else if (actual < n) {
+    g_used.fetch_sub(std::int64_t(n - actual), std::memory_order_relaxed);
+  }
   return p;
 #endif
 }
@@ -139,8 +190,7 @@ std::size_t limit() { return g_limit.load(); }
 const char *env_var() { return g_env; }
 void require(std::size_t bytes) { check(bytes); }
 void charge(std::size_t bytes) {
-  check(bytes);
-  g_used.fetch_add(std::int64_t(bytes), std::memory_order_relaxed);
+  if (!try_reserve(bytes)) trip(bytes);
 }
 void release(std::size_t bytes) { g_used.fetch_sub(std::int64_t(bytes), std::memory_order_relaxed); }
 

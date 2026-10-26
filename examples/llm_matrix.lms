@@ -1,0 +1,35 @@
+mkdir("data"); mkdir("images"); mkdir("reports"); mkdir("build/examples"); mkdir("docs/images");
+
+p = _dsl_ cli="lmcurl" install="github:lmctl-ai/lmcurl@latest";
+let m=curl.mock();
+let s=curl.session(m.url());
+let matrix=llm.mock("fixture").matrix("fixture-a,fixture-b,fixture-c","ping");assert_eq(matrix.len(),3);assert_close(matrix.pass_rate("pong"),1.0,0.0001);matrix.csv("data/model_matrix.csv");
+let heat="x,y,pass\n";
+for(i in range(0,matrix.len())){let a=0;let b=0;if(matrix.at(i).contains("pong")){a=1;}if(matrix.at(i).json_valid()){b=1;}heat=heat+"0,"+str(i)+","+str(a)+"\n1,"+str(i)+","+str(b)+"\n";}
+file_write("data/model_heatmap.csv",heat);
+let csv="metric,value\n";
+csv=csv+"fixture a output tokens,"+str(matrix.at(0).output_tokens())+"\n";
+csv=csv+"fixture b output tokens,"+str(matrix.at(1).output_tokens())+"\n";
+csv=csv+"fixture c output tokens,"+str(matrix.at(2).output_tokens())+"\n";
+file_write("data/llm_matrix.csv",csv);
+m.stop();
+end _dsl_
+savedsl(p,"build/examples/llm_matrix.dslb");
+r = system ${dsl_cli(p)} --dsl build/examples/llm_matrix.dslb;
+if(r.code != 0){println(r.stdout);println(r.stderr);}
+assert(r.code==0);
+plot = _dsl_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+plot.png("images/llm_matrix.png",900,560);
+plot.cmd("set datafile separator ','");
+plot.cmd("set title 'Prompt contract matrix (offline fixtures)'");
+plot.cmd("set xrange [-0.5:1.5]; set yrange [-0.5:2.5]; unset key");
+plot.cmd("set xtics ('contains pong' 0, 'valid JSON' 1); set ytics ('fixture a' 0, 'fixture b' 1, 'fixture c' 2)");
+plot.cmd("set palette defined (0 '#cf222e', 1 '#1a7f37'); set cbrange [0:1]; set cbtics ('FAIL' 0, 'PASS' 1)");
+plot.cmd("plot 'data/model_heatmap.csv' every ::1 using 1:2:3 with image, '' every ::1 using 1:2:(sprintf('%d',$3)) with labels tc rgb '#ffffff' font ',16'");
+plot.close();
+end _dsl_
+savedsl(plot,"build/examples/llm_matrix-plot.dslb");
+r = system ${dsl_cli(plot)} --dsl build/examples/llm_matrix-plot.dslb;
+assert(r.code==0);
+assert(copy_file("images/llm_matrix.png","docs/images/llm_matrix.png"));
+println("images/llm_matrix.png");

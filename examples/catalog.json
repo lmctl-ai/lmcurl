@@ -1,0 +1,194 @@
+[
+  {
+    "name": "rest_crud",
+    "title": "A user record through its complete lifecycle",
+    "script": "examples/rest_crud.lms",
+    "image": "docs/images/rest_crud.png"
+  },
+  {
+    "name": "login_session",
+    "title": "Login capture unlocks a protected resource",
+    "script": "examples/login_session.lms",
+    "image": "docs/images/login_session.png"
+  },
+  {
+    "name": "cookie_jar",
+    "title": "A session keeps cookies across requests",
+    "script": "examples/cookie_jar.lms",
+    "image": "docs/images/cookie_jar.png"
+  },
+  {
+    "name": "auth_boundary",
+    "title": "Anonymous and authenticated access",
+    "script": "examples/auth_boundary.lms",
+    "image": "docs/images/auth_boundary.png"
+  },
+  {
+    "name": "redirect_chain",
+    "title": "Following a bounded redirect chain",
+    "script": "examples/redirect_chain.lms",
+    "image": "docs/images/redirect_chain.png"
+  },
+  {
+    "name": "retry_recovery",
+    "title": "Recovery after three transient failures",
+    "script": "examples/retry_recovery.lms",
+    "image": "docs/images/retry_recovery.png"
+  },
+  {
+    "name": "poll_readiness",
+    "title": "Poll assertions until the service is ready",
+    "script": "examples/poll_readiness.lms",
+    "image": "docs/images/poll_readiness.png"
+  },
+  {
+    "name": "json_contract",
+    "title": "Required fields and collection bounds",
+    "script": "examples/json_contract.lms",
+    "image": "docs/images/json_contract.png"
+  },
+  {
+    "name": "jsonpath_projection",
+    "title": "Typed JSONPath projections and predicates",
+    "script": "examples/jsonpath_projection.lms",
+    "image": "docs/images/jsonpath_projection.png"
+  },
+  {
+    "name": "xml_catalog",
+    "title": "XPath checks on an XML catalog",
+    "script": "examples/xml_catalog.lms",
+    "image": "docs/images/xml_catalog.png"
+  },
+  {
+    "name": "html_extract",
+    "title": "Extracting HTML with XPath",
+    "script": "examples/html_extract.lms",
+    "image": "docs/images/html_extract.png"
+  },
+  {
+    "name": "csv_cases",
+    "title": "Three CSV rows exercise one request template",
+    "script": "examples/csv_cases.lms",
+    "image": "docs/images/csv_cases.png"
+  },
+  {
+    "name": "json_cases",
+    "title": "JSON data drives a reusable request",
+    "script": "examples/json_cases.lms",
+    "image": "docs/images/json_cases.png"
+  },
+  {
+    "name": "tag_filter",
+    "title": "Select only the smoke contract",
+    "script": "examples/tag_filter.lms",
+    "image": "docs/images/tag_filter.png"
+  },
+  {
+    "name": "parallel_checks",
+    "title": "Independent checks run concurrently",
+    "script": "examples/parallel_checks.lms",
+    "image": "docs/images/parallel_checks.png"
+  },
+  {
+    "name": "failure_reports",
+    "title": "A failed contract produces actionable reports",
+    "script": "examples/failure_reports.lms",
+    "image": "docs/images/failure_reports.png"
+  },
+  {
+    "name": "suite_lifecycle",
+    "title": "Setup runs before protected checks",
+    "script": "examples/suite_lifecycle.lms",
+    "image": "docs/images/suite_lifecycle.png"
+  },
+  {
+    "name": "form_and_upload",
+    "title": "Form encoding and multipart upload",
+    "script": "examples/form_and_upload.lms",
+    "image": "docs/images/form_and_upload.png"
+  },
+  {
+    "name": "sse_events",
+    "title": "Event-stream data stays bounded and inspectable",
+    "script": "examples/sse_events.lms",
+    "image": "docs/images/sse_events.png"
+  },
+  {
+    "name": "compression",
+    "title": "Compressed responses are decoded before queries",
+    "script": "examples/compression.lms",
+    "image": "docs/images/compression.png"
+  },
+  {
+    "name": "response_limits",
+    "title": "Oversized responses fail their contract",
+    "script": "examples/response_limits.lms",
+    "image": "docs/images/response_limits.png"
+  },
+  {
+    "name": "snapshot_contract",
+    "title": "Snapshots detect response regressions",
+    "script": "examples/snapshot_contract.lms",
+    "image": "docs/images/snapshot_contract.png"
+  },
+  {
+    "name": "openapi_contract",
+    "title": "Check a JSON OpenAPI response contract",
+    "script": "examples/openapi_contract.lms",
+    "image": "docs/images/openapi_contract.png"
+  },
+  {
+    "name": "load_latency",
+    "title": "Virtual users and latency thresholds",
+    "script": "examples/load_latency.lms",
+    "image": "docs/images/load_latency.png"
+  },
+  {
+    "name": "llm_prompt",
+    "title": "A prompt regression is an ordinary assertion",
+    "script": "examples/llm_prompt.lms",
+    "image": "docs/images/llm_prompt.png"
+  },
+  {
+    "name": "llm_streams",
+    "title": "Both OpenAI and Ollama streaming fixtures",
+    "script": "examples/llm_streams.lms",
+    "image": "docs/images/llm_streams.png"
+  },
+  {
+    "name": "llm_sampling",
+    "title": "Sampling reports measured prompt pass rates",
+    "script": "examples/llm_sampling.lms",
+    "image": "docs/images/llm_sampling.png"
+  },
+  {
+    "name": "llm_matrix",
+    "title": "A model matrix compares one prompt side by side",
+    "script": "examples/llm_matrix.lms",
+    "image": "docs/images/llm_matrix.png"
+  },
+  {
+    "name": "llm_replay",
+    "title": "Recorded completions replay without credentials",
+    "script": "examples/llm_replay.lms",
+    "image": "docs/images/llm_replay.png"
+  },
+  {
+    "name": "llm_json",
+    "title": "Structured completions have schema contracts",
+    "script": "examples/llm_json.lms",
+    "image": "docs/images/llm_json.png"
+  },
+  {
+    "name": "timing_breakdown",
+    "title": "Where a delayed response spends its time",
+    "script": "examples/timing_breakdown.lms",
+    "image": "docs/images/timing_breakdown.png"
+  },
+  {
+    "name": "secret_redaction",
+    "title": "Credentials stay out of saved artifacts",
+    "script": "examples/secret_redaction.lms",
+    "image": "docs/images/secret_redaction.png"
+  }
+]

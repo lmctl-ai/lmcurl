@@ -1,0 +1,257 @@
+context curl: Curl
+context llm: Llm
+fn assert(bool) -> void
+fn assert_close(float, float, float) -> void
+fn assert_eq(bool, bool) -> void
+fn assert_eq(int, int) -> void
+fn assert_eq(string, string) -> void
+fn file_append(string, string) -> void
+fn file_exists(string) -> bool
+fn file_lines(string) -> StrList
+fn file_read(string) -> string
+fn file_write(string, string) -> void
+fn float_list() -> FloatList
+fn int_list() -> IntList
+fn llm_calls() -> int
+fn llm_cost() -> float
+fn math_abs(float) -> float
+fn math_abs(int) -> int
+fn math_ceil(float) -> float
+fn math_ceil(int) -> int
+fn math_floor(float) -> float
+fn math_floor(int) -> int
+fn math_max(float, float) -> float
+fn math_max(int, int) -> int
+fn math_min(float, float) -> float
+fn math_min(int, int) -> int
+fn math_pow(float, float) -> float
+fn math_pow(int, int) -> int
+fn math_round(float) -> float
+fn math_round(int) -> int
+fn math_sqrt(float) -> float
+fn math_sqrt(int) -> int
+fn print(string) -> void
+fn println(string) -> void
+fn str_contains(string, string) -> bool
+fn str_ends_with(string, string) -> bool
+fn str_find(string, string) -> int
+fn str_is_float(string) -> bool
+fn str_is_int(string) -> bool
+fn str_len(string) -> int
+fn str_list() -> StrList
+fn str_lower(string) -> string
+fn str_map() -> StrMap
+fn str_match(string, string) -> bool
+fn str_repeat(string, int) -> string
+fn str_replace(string, string, string) -> string
+fn str_split(string, string) -> StrList
+fn str_starts_with(string, string) -> bool
+fn str_substr(string, int, int) -> string
+fn str_to_float(string) -> float
+fn str_to_int(string) -> int
+fn str_trim(string) -> string
+fn str_upper(string) -> string
+method Chat.assistant(string) -> Chat
+method Chat.cassette(string) -> Chat
+method Chat.json_mode(bool) -> Chat
+method Chat.max_tokens(int) -> Chat
+method Chat.replay(string) -> Chat
+method Chat.sample(int, float) -> Sample
+method Chat.seed(int) -> Chat
+method Chat.send() -> Result
+method Chat.stream(bool) -> Chat
+method Chat.system(string) -> Chat
+method Chat.temperature(float) -> Chat
+method Chat.timeout(int) -> Chat
+method Chat.tool(string, string) -> Chat
+method Chat.user(string) -> Chat
+method Curl.env(string) -> string
+method Curl.load(Request, int, float, int) -> LoadResult
+method Curl.mock() -> Mock
+method Curl.query_json(string, string) -> Query
+method Curl.query_text(string) -> Query
+method Curl.schema_valid(string, string) -> bool
+method Curl.session(string) -> Session
+method Curl.suite(string) -> Suite
+method Curl.version() -> string
+method FloatList.add(float) -> FloatList
+method FloatList.at(int) -> float
+method FloatList.clear() -> FloatList
+method FloatList.contains(float) -> bool
+method FloatList.index_of(float) -> int
+method FloatList.len() -> int
+method FloatList.set(int, float) -> FloatList
+method IntList.add(int) -> IntList
+method IntList.at(int) -> int
+method IntList.clear() -> IntList
+method IntList.contains(int) -> bool
+method IntList.index_of(int) -> int
+method IntList.len() -> int
+method IntList.set(int, int) -> IntList
+method Llm.deepseek(string) -> Provider
+method Llm.ledger(string) -> void
+method Llm.mock(string) -> Provider
+method Llm.ollama(string) -> Provider
+method Llm.openrouter(string) -> Provider
+method Llm.provider(string, string, string) -> Provider
+method LoadResult.error_rate() -> float
+method LoadResult.p50_ms() -> float
+method LoadResult.p95_ms() -> float
+method LoadResult.p99_ms() -> float
+method LoadResult.requests() -> int
+method LoadResult.threshold(float, float) -> bool
+method Matrix.at(int) -> Result
+method Matrix.csv(string) -> void
+method Matrix.len() -> int
+method Matrix.pass_rate(string) -> float
+method Mock.stop() -> void
+method Mock.url() -> string
+method Provider.chat(string) -> Chat
+method Provider.matrix(string, string) -> Matrix
+method Provider.model(string) -> Provider
+method Query.contains(string) -> bool
+method Query.count() -> int
+method Query.ends_with(string) -> bool
+method Query.equals(string) -> bool
+method Query.exists() -> bool
+method Query.format(string) -> Query
+method Query.gt(string) -> bool
+method Query.html_escape() -> Query
+method Query.includes(string) -> bool
+method Query.is_collection() -> bool
+method Query.is_empty() -> bool
+method Query.is_integer() -> bool
+method Query.is_string() -> bool
+method Query.lt(string) -> bool
+method Query.matches(string) -> bool
+method Query.missing() -> bool
+method Query.not_equals(string) -> bool
+method Query.nth(int) -> Query
+method Query.regex(string) -> Query
+method Query.replace(string, string) -> Query
+method Query.split(string) -> Query
+method Query.starts_with(string) -> bool
+method Query.to_date(string) -> Query
+method Query.to_int() -> int
+method Query.url_decode() -> Query
+method Query.value() -> string
+method Report.assert_all() -> bool
+method Report.console() -> string
+method Report.csv(string) -> void
+method Report.failed() -> int
+method Report.html(string) -> void
+method Report.json() -> string
+method Report.junit(string) -> void
+method Report.passed() -> int
+method Report.save(string) -> void
+method Report.skipped() -> int
+method Report.tap() -> string
+method Request.basic(string, string) -> Request
+method Request.bearer_env(string) -> Request
+method Request.body(string) -> Request
+method Request.cacert(string) -> Request
+method Request.cert(string, string) -> Request
+method Request.digest(string, string) -> Request
+method Request.follow(bool) -> Request
+method Request.form(string, string) -> Request
+method Request.header(string, string) -> Request
+method Request.http2(bool) -> Request
+method Request.insecure(bool) -> Request
+method Request.json(string) -> Request
+method Request.limit(int) -> Request
+method Request.part(string, string) -> Request
+method Request.proxy(string) -> Request
+method Request.resolve(string) -> Request
+method Request.retry(int, int) -> Request
+method Request.send() -> Response
+method Request.stream(bool) -> Request
+method Request.timeout(int) -> Request
+method Request.upload(string, string, string) -> Request
+method Response.assert_json_schema(string) -> bool
+method Response.assert_openapi(string, string, string) -> bool
+method Response.attempts() -> int
+method Response.body() -> string
+method Response.bytes() -> int
+method Response.certificate() -> string
+method Response.cookie(string) -> string
+method Response.error() -> string
+method Response.header(string) -> string
+method Response.json(string) -> Query
+method Response.query(string, string) -> Query
+method Response.save(string) -> void
+method Response.snapshot(string, bool) -> bool
+method Response.sse_count() -> int
+method Response.status() -> int
+method Response.time(string) -> float
+method Response.url() -> string
+method Response.xpath(string) -> Query
+method Result.contains(string) -> bool
+method Result.equals(string) -> bool
+method Result.estimated_cost() -> float
+method Result.finish() -> string
+method Result.input_tokens() -> int
+method Result.json() -> string
+method Result.json_valid() -> bool
+method Result.latency_ms() -> float
+method Result.length() -> int
+method Result.matches(string) -> bool
+method Result.model() -> string
+method Result.not_contains(string) -> bool
+method Result.output_tokens() -> int
+method Result.schema_valid(string) -> bool
+method Result.status() -> int
+method Result.text() -> string
+method Result.tools() -> string
+method Sample.at(int) -> Result
+method Sample.csv(string) -> void
+method Sample.len() -> int
+method Sample.pass_rate(string) -> float
+method Session.delete(string) -> Request
+method Session.get(string) -> Request
+method Session.get_var(string) -> string
+method Session.head(string) -> Request
+method Session.header(string, string) -> Session
+method Session.patch(string) -> Request
+method Session.post(string) -> Request
+method Session.put(string) -> Request
+method Session.request(string, string) -> Request
+method Session.secret(string, string) -> Session
+method Session.set(string, string) -> Session
+method StrList.add(string) -> StrList
+method StrList.at(int) -> string
+method StrList.clear() -> StrList
+method StrList.contains(string) -> bool
+method StrList.index_of(string) -> int
+method StrList.join(string) -> string
+method StrList.len() -> int
+method StrList.set(int, string) -> StrList
+method StrMap.clear() -> StrMap
+method StrMap.get(string) -> string
+method StrMap.get_or(string, string) -> string
+method StrMap.has(string) -> bool
+method StrMap.key_at(int) -> string
+method StrMap.len() -> int
+method StrMap.remove(string) -> bool
+method StrMap.set(string, string) -> StrMap
+method Suite.after(Request) -> Suite
+method Suite.before(Request) -> Suite
+method Suite.data_csv(string) -> Suite
+method Suite.data_json(string) -> Suite
+method Suite.fail_fast(bool) -> Suite
+method Suite.filter(string) -> Suite
+method Suite.parallel(bool) -> Suite
+method Suite.report() -> Report
+method Suite.test_request(string, Request) -> Test
+method Test.capture(string, string) -> Test
+method Test.capture_secret(string, string) -> Test
+method Test.expect_body(string) -> Test
+method Test.expect_exact(string) -> Test
+method Test.expect_json(string, string) -> Test
+method Test.expect_schema(string) -> Test
+method Test.expect_status(int) -> Test
+method Test.expect_status_in(int, int) -> Test
+method Test.expect_xpath(string, string) -> Test
+method Test.poll_json(string, string, int, int) -> Test
+method Test.retry(int, int) -> Test
+method Test.tag(string) -> Test
+method Test.timeout(int) -> Test

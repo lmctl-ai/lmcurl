@@ -1,0 +1,35 @@
+mkdir("data"); mkdir("images"); mkdir("reports"); mkdir("build/examples"); mkdir("docs/images");
+
+p = _dsl_ cli="lmcurl" install="github:lmctl-ai/lmcurl@latest";
+let m=curl.mock();
+let s=curl.session(m.url());
+let r=s.get("/json").send();
+let valid=r.assert_json_schema("{\"type\":\"object\",\"required\":[\"ok\",\"items\"],\"properties\":{\"items\":{\"type\":\"array\",\"minItems\":3}}}");
+let invalid=r.assert_json_schema("{\"type\":\"object\",\"required\":[\"missing\"]}");assert_eq(valid,true);assert_eq(invalid,false);
+let good=0;if(valid){good=1;}let bad=0;if(invalid){bad=1;}
+let csv="metric,value\n";
+csv=csv+"valid contract,"+str(good)+"\n";
+csv=csv+"missing required field,"+str(bad)+"\n";
+csv=csv+"items observed,"+str(r.json("$.items").count())+"\n";
+file_write("data/json_contract.csv",csv);
+m.stop();
+end _dsl_
+savedsl(p,"build/examples/json_contract.dslb");
+r = system ${dsl_cli(p)} --dsl build/examples/json_contract.dslb;
+if(r.code != 0){println(r.stdout);println(r.stderr);}
+assert(r.code==0);
+plot = _dsl_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+plot.png("images/json_contract.png",900,560);
+plot.cmd("set datafile separator ','");
+plot.cmd("set title \"Required fields and collection bounds\"");
+plot.cmd("set yrange [0:*]; set offsets 0,0,graph 0.12,0; set grid y; unset key; set style fill solid 0.85; set boxwidth 0.65");
+plot.cmd("set xtics rotate by -15 font ',10'");
+plot.cmd("set ylabel \"observed value\"");
+plot.cmd("plot 'data/json_contract.csv' every ::1 using 0:2:xtic(1) with boxes lc rgb '#0969da', '' every ::1 using 0:2:(sprintf('%.3g',$2)) with labels offset 0,0.8");
+plot.close();
+end _dsl_
+savedsl(plot,"build/examples/json_contract-plot.dslb");
+r = system ${dsl_cli(plot)} --dsl build/examples/json_contract-plot.dslb;
+assert(r.code==0);
+assert(copy_file("images/json_contract.png","docs/images/json_contract.png"));
+println("images/json_contract.png");

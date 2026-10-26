@@ -1,0 +1,98 @@
+{
+  "live_opt_in": true,
+  "default_example_cap_usd": 0.02,
+  "hard_run_cap_usd": 0.25,
+  "provider_results": [
+    {
+      "provider": "openrouter",
+      "requested_model": "openrouter/free",
+      "model": "poolside/laguna-s-2.1:free",
+      "status": "passed",
+      "http_status": 200,
+      "input_tokens": 47,
+      "output_tokens": 3,
+      "estimated_cost_usd": 0.0,
+      "attempts": 1,
+      "assertions": {
+        "completion_received": true,
+        "nonempty_text": true,
+        "token_usage": true
+      },
+      "price_basis": "OpenRouter explicit free catalog variant; no paid fallbacks"
+    },
+    {
+      "provider": "deepseek",
+      "requested_model": "deepseek-flash",
+      "model": "deepseek-flash",
+      "status": "passed",
+      "http_status": 200,
+      "input_tokens": 8,
+      "output_tokens": 1,
+      "estimated_cost_usd": 3.6e-06,
+      "attempts": 1,
+      "assertions": {
+        "completion_received": true,
+        "nonempty_text": true,
+        "token_usage": true
+      },
+      "price_basis": "2026-10-26 peak cache-miss USD per million tokens"
+    },
+    {
+      "provider": "ollama-cloud",
+      "requested_model": "gpt-oss:20b",
+      "model": "gpt-oss:20b",
+      "status": "passed",
+      "http_status": 200,
+      "input_tokens": 71,
+      "output_tokens": 16,
+      "estimated_cost_usd": 0.0,
+      "attempts": 1,
+      "assertions": {
+        "completion_received": true,
+        "nonempty_text": false,
+        "token_usage": true
+      },
+      "price_basis": "Ollama local/subscription marginal token price; subscription allocation excluded"
+    },
+    {
+      "provider": "ollama-local",
+      "requested_model": "llama3.2:3b",
+      "model": "llama3.2:3b",
+      "status": "passed",
+      "http_status": 200,
+      "input_tokens": 29,
+      "output_tokens": 3,
+      "estimated_cost_usd": 0.0,
+      "attempts": 1,
+      "assertions": {
+        "completion_received": true,
+        "nonempty_text": true,
+        "token_usage": true
+      },
+      "price_basis": "configured local endpoint; external/subscription allocation excluded",
+      "previous_attempts": [
+        {
+          "provider": "ollama-local",
+          "requested_model": "llama3.2:3b",
+          "model": "llama3.2:3b",
+          "status": "failed",
+          "http_status": 200,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "estimated_cost_usd": 0.0,
+          "attempts": 1,
+          "assertions": {
+            "completion_received": false,
+            "nonempty_text": false,
+            "token_usage": false
+          },
+          "price_basis": "configured local endpoint; external/subscription allocation excluded",
+          "failure_category": "request failed or provider unavailable"
+        }
+      ]
+    }
+  ],
+  "total_estimated_cost_usd": 3.6e-06,
+  "secrets_recorded": false,
+  "pricing_note": "DeepSeek uses conservative peak/cache-miss table rates; OpenRouter free variants are zero; local/Ollama subscription marginal prices exclude infrastructure/subscription allocation."
+}

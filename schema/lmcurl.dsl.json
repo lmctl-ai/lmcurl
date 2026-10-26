@@ -91,6 +91,14 @@
             "returns": "Chat"
           }
         ],
+        "timeout": [
+          {
+            "params": [
+              "int"
+            ],
+            "returns": "Chat"
+          }
+        ],
         "tool": [
           {
             "params": [

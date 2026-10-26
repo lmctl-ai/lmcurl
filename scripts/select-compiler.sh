@@ -2,7 +2,7 @@
 # Select by emitted bytecode capability, not CLI version or schema support alone.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-WORK="$(mktemp -d "${TMPDIR:-/tmp}/lmnum-compiler-XXXXXX")"
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/lmcurl-compiler-XXXXXX")"
 trap 'rm -rf "$WORK"' EXIT
 # A native (mingw) python cannot see MSYS /tmp paths: hand it drive-letter paths when cygpath exists.
 native() { if command -v cygpath >/dev/null 2>&1; then cygpath -m "$1"; else printf '%s\n' "$1"; fi; }
@@ -32,7 +32,7 @@ PY
 then
   printf '%s\n' "$candidate"
 else
-  if [ -n "${LMNUM_DEBUG:-}" ]; then
+  if [ -n "${LMCURL_DEBUG:-}" ]; then
     echo "--- compiler probe diagnostics (candidate=$candidate)" >&2
     cat "$WORK/probe.lms" >&2 || true
     [ -n "$candidate" ] && "$candidate" --dsl-signatures "$WORK/probe.schema.json" 2>&1 | head -3 >&2
