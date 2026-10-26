@@ -26,6 +26,7 @@ m.stop();
 end _dsl_
 savedsl(p,"build/web-mock/lmcurl.dslb");
 r = system ${dsl_cli(p)} --dsl build/web-mock/lmcurl.dslb;
+if(r.code!=0){println(r.stderr);println(r.stdout);}
 assert(r.code==0);
 q = _dsl_ cli="lmhtml" install="github:lmctl-ai/lmhtml@latest";
 let products=html.parse(file_read("build/web-mock/products.html"));
@@ -40,5 +41,6 @@ report.fail_if_any();
 end _dsl_
 savedsl(q,"build/web-mock/lmhtml.dslb");
 r2 = system ${dsl_cli(q)} --dsl build/web-mock/lmhtml.dslb;
+if(r2.code!=0){println(r2.stderr);println(r2.stdout);}
 assert(r2.code==0);
 println("PASS lmcurl mock fixtures downloaded and lmhtml parsed HTML/RSS/login/robots");

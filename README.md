@@ -22,7 +22,7 @@ npm install -g @lmctl-ai/lmctl@0.2.420
 lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_site_mirror.lms
 ```
 
-The **16 new downloader/parser stories** run against lmcurl’s native loopback mock site. lmcurl performs HTTP; lmhtml v0.7.3 selects elements and attributes, extracts rows, and compares documents. CSV/text/JSON files pass values between the hosts. The mirror writes `mirror/index.html`, local assets and `about.html`; every story writes `images/<name>.png` and reports under `reports/`. Host installation needs GitHub access once; the example workloads use only localhost.
+The **16 new downloader/parser stories** run against lmcurl’s native loopback mock site. lmcurl performs HTTP; lmhtml v0.7.4 selects elements and attributes, extracts rows, and compares documents. CSV/text/JSON files pass values between the hosts. The mirror writes `mirror/index.html`, local assets and `about.html`; every story writes `images/<name>.png` and reports under `reports/`. Host installation needs GitHub access once; the example workloads use only localhost.
 
 <details>
 <summary>Ten more downloader/parser pictures and runnable captions</summary>

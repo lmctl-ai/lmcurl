@@ -12,4 +12,6 @@ OpenSSL must receive `--libdir=lib64` explicitly. Its upstream default is lib64 
 
 New examples need lmcurl >=0.1.1 for Mock.serve. Use opaque `_dsl_` values with savedsl/system; strings are not executable DSL. Variables do not cross native processes: parser exports must be read back by outer lmscript. `${value}` already emits a typed DSL literal and must not be wrapped in extra quotes.
 
-lmhtml v0.7.3 is an HTML5 parser. The XML recipes select unprefixed elements; RSS uses permalink GUIDs because HTML treats link as a void element. Atom URLs come from link href. Table-to-CSV and field handoff are example glue, not new lmhtml APIs. Robots handling intentionally covers the fixture subset (wildcard agent, Disallow prefixes and Crawl-delay), not complete RFC policy.
+lmhtml v0.7.4 is an HTML5 parser. The XML recipes select unprefixed elements; RSS uses permalink GUIDs because HTML treats link as a void element. Atom URLs come from link href. Table-to-CSV and field handoff are example glue, not new lmhtml APIs. Robots handling intentionally covers the fixture subset (wildcard agent, Disallow prefixes and Crawl-delay), not complete RFC policy.
+
+The original published lmhtml v0.7.3 binary predates standard file registration even though current source had already migrated. With the current compiler it returned LOAD_UNBOUND for file_read/file_write. The recipes require >=0.7.4 and check the executable version before starting the mock. Always validate against downloaded release binaries, not only a local build with the same version text.

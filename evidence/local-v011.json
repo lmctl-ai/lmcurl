@@ -29,5 +29,8 @@
   "new_request_ledgers_validated": true,
   "new_workload_estimated_cost_usd": 0,
   "known_credential_values_found": false,
-  "desktop_native_transport_supported": false
+  "desktop_native_transport_supported": false,
+  "parser_version": "lmhtml 0.7.4",
+  "parser_source": "local compatibility patch candidate; published assets verified separately",
+  "old_parser_guard_checked": true
 }

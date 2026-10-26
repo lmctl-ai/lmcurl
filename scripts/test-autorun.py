@@ -21,7 +21,15 @@ with tempfile.TemporaryDirectory(prefix='lmcurl-autorun-') as td:
   # Never echo process output: the public result records only status and image metadata.
   assert result.returncode==0,'autorun failed: '+row['name']
   image=work/'images'/(row['name']+'.png');data=image.read_bytes();assert data[:8]==b'\x89PNG\r\n\x1a\n' and len(data)<=307200
-  rows.append({'example':row['name'],'url':url,'passed':True,'elapsed_seconds':round(time.monotonic()-start,3),'image_bytes':len(data),'image_sha256':hashlib.sha256(data).hexdigest()})
+  cost={}
+  if row['name'].startswith('web_'):
+   ledger=json.loads((work/'reports'/(row['name']+'-cost.json')).read_text())
+   events=[json.loads(line) for line in (work/'data/web-requests.jsonl').read_text().splitlines() if line]
+   assert ledger['estimated_cost_usd']==0 and len(events)==ledger['requests'] and events
+   assert all(v['route'].startswith('/site/') and v['estimated_cost_usd']==0 for v in events)
+   if row['name']=='web_robots_crawler':assert all(not v['route'].startswith('/site/private/') for v in events)
+   cost={'estimated_cost_usd':0,'requests':ledger['requests']}
+  rows.append({'cost':cost,'example':row['name'],'url':url,'passed':True,'elapsed_seconds':round(time.monotonic()-start,3),'image_bytes':len(data),'image_sha256':hashlib.sha256(data).hexdigest()})
   print('PASS autorun '+row['name'],flush=True)
  hosts=[p for p in cache.rglob('lmcurl') if p.is_file() and os.access(p,os.X_OK)]
  assert hosts,'autorun did not install lmcurl into the fresh cache'

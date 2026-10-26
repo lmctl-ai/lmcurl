@@ -82,7 +82,19 @@ for row in A+B:
  code+='mkdir("data"); mkdir("build"); mkdir("images"); mkdir("reports"); mkdir("docs/images");\n'
  code+='for (path in ["build/web-ready.txt","build/web-stop.txt"]) { if (file_exists(path)) { remove_file(path); } }\nwrite_file("data/web-requests.jsonl","");\n'
  code+=COMMON+'\nfn story(base) {\n'+story+'\n}\n'
- code+='parallel([serve_site(), wait_and_run()]);\n'
+ code+=r'''# Older published lmhtml binaries predate the implicit standard file catalog.
+html_probe=_dsl_ cli="lmhtml" install="github:lmctl-ai/lmhtml@latest";
+let doc=html.parse("<html><body>compatibility probe</body></html>");
+end _dsl_
+html_version=system ${dsl_cli(html_probe)} --version;
+check(html_version.code==0,"cannot query lmhtml version");
+version_words=split(trim(html_version.stdout)," ");
+check(version_words.len()==2&&version_words[0]=="lmhtml","unexpected lmhtml version output");
+version_parts=split(version_words[1],".");check(version_parts.len()==3,"unexpected lmhtml version number");
+major=json_parse(version_parts[0]);minor=json_parse(version_parts[1]);patch=json_parse(version_parts[2]);
+check(major>0||minor>7||(minor==7&&patch>=4),"lmhtml >=0.7.4 is required; upgrade or remove an older PATH installation");
+parallel([serve_site(), wait_and_run()]);
+'''
  code+='events=read_lines("data/web-requests.jsonl"); request_count=0;\nfor (line in events) { if (!is_blank(line)) { request_count=request_count+1; } }\n'
  code+='write_json("reports/'+name+'-cost.json",{mode:"offline-loopback",currency:"USD",price_table:{loopback_request_usd:0},example_cap_usd:0.02,hard_run_cap_usd:0.25,requests:request_count,estimated_cost_usd:0});\n'
  code+='println("estimated cost: $0.0000 (loopback fixtures only)");\n'

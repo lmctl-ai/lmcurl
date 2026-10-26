@@ -1,0 +1,9 @@
+{
+  "published_version": "lmhtml 0.7.3",
+  "linux_x64_sha256": "2452ef2465d39bc729d683b0bd4daa5e5682858580f815635eba4a14c9b743bf",
+  "repro": "Compile tests/web-mock.lms with released lmhtml on PATH using lmscript 0.2.420, then execute its parser bytecode",
+  "runtime_error_code": "LOAD_UNBOUND",
+  "missing_import": "fn file_read(string) -> string",
+  "current_lmhtml_main_has_standard_catalog": true,
+  "required_patch_version": "0.7.4"
+}
