@@ -5,3 +5,4 @@
 - [03-build-run-test.md](03-build-run-test.md): local build gate and verification.
 - [04-gotchas.md](04-gotchas.md): limits, redaction and bytecode facts.
 - [05-open-items.md](05-open-items.md): current unsupported or incomplete areas.
+- [06-examples-and-release.md](06-examples-and-release.md): reproducible examples, live evidence and published artifacts.

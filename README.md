@@ -67,3 +67,5 @@ The API is typed around `Curl`, `Session`, `Request`, `Response`, `Query`, `Suit
 LLM calls reserve a default `$0.02` example cap and hard `$0.25` run cap. The recorded live evidence used an OpenRouter free model ($0), DeepSeek ($0.00000360), Ollama cloud ($0 marginal subscription allocation) and Ollama local ($0), with no secrets recorded; see [evidence/live-llm-v010.json](evidence/live-llm-v010.json).
 
 See [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES), [durable-memory](durable-memory/index.md), and [LICENSE](LICENSE). Public CI is fake/offline by default; live credentials never belong in CI.
+
+[v0.1.0 release](https://github.com/lmctl-ai/lmcurl/releases/tag/v0.1.0) includes five executables and SHA256SUMS. [All 32 public autoruns](evidence/autorun-v010.json) passed from empty directories with a fresh tool cache. For source builds, use current main, which includes the build-only portability fixes described in the release notes.

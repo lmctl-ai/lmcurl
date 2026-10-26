@@ -8,7 +8,8 @@ if not env.get('GITHUB_TOKEN'):
  env['GITHUB_TOKEN']=subprocess.check_output(['gh','auth','token'],text=True,timeout=30).strip()
 cli=shutil.which('lmctl');assert cli,'lmctl is required'
 # Existing PATH installations would hide whether the published host installs correctly.
-assert shutil.which('lmcurl') is None,'remove existing lmcurl from PATH before this verification'
+env['PATH']=os.pathsep.join(p for p in env['PATH'].split(os.pathsep) if p and not any((Path(p)/name).is_file() for name in ('lmcurl','lmplot','lmdraw')))
+assert all(shutil.which(name,path=env['PATH']) is None for name in ('lmcurl','lmplot','lmdraw'))
 rows=[]
 with tempfile.TemporaryDirectory(prefix='lmcurl-autorun-') as td:
  base=Path(td);cache=base/'tool-cache';env['LMSCRIPT_TOOL_CACHE']=str(cache);env['LMCTL_HOME']=str(base/'lmctl')
@@ -24,6 +25,6 @@ with tempfile.TemporaryDirectory(prefix='lmcurl-autorun-') as td:
  assert hosts,'autorun did not install lmcurl into the fresh cache'
  host=hosts[0];version=subprocess.check_output([str(host),'--version'],env=env,text=True,timeout=10).strip();assert version=='lmcurl 0.1.0'
  release=hashlib.sha256(host.read_bytes()).hexdigest()
- proof={'version':version,'fresh_tool_cache':True,'empty_working_directory_per_example':True,'installed_binary_sha256':release,'examples':rows}
+ proof={'version':version,'fresh_tool_cache':True,'hosts_removed_from_path':['lmcurl','lmplot','lmdraw'],'empty_working_directory_per_example':True,'installed_binary_sha256':release,'examples':rows}
  (root/'evidence/autorun-v010.json').write_text(json.dumps(proof,indent=2)+'\n')
 print('PASS all '+str(len(rows))+' public autoruns; release binary installed from a fresh cache')
