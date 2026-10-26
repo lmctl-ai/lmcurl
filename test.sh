@@ -16,8 +16,15 @@ case "$(uname -s)" in Darwin|MINGW*|MSYS*|CYGWIN*)
 esac
 if ! scripts/sync-deps.sh --verify >/dev/null 2>&1; then timeout 600 scripts/sync-deps.sh; fi
 scripts/sync-sdk.sh --verify
-cmake -S . -B "$BUILD_DIR" -G Ninja -DCMAKE_BUILD_TYPE=Release >"/tmp/lmcurl-test-config.log" 2>&1
-cmake --build "$BUILD_DIR" --parallel "${BUILD_JOBS:-2}" >"/tmp/lmcurl-test-build.log" 2>&1
+if ! cmake -S . -B "$BUILD_DIR" -G Ninja -DCMAKE_BUILD_TYPE=Release >"/tmp/lmcurl-test-config.log" 2>&1; then
+ tail -80 /tmp/lmcurl-test-config.log
+ for log in "$BUILD_DIR"/openssl-*-errors.log; do [[ ! -f "$log" ]] || tail -40 "$log"; done
+ exit 1
+fi
+if ! cmake --build "$BUILD_DIR" --parallel "${BUILD_JOBS:-2}" >"/tmp/lmcurl-test-build.log" 2>&1; then
+ tail -80 /tmp/lmcurl-test-build.log
+ exit 1
+fi
 exe="$(cd "$BUILD_DIR" && pwd)/lmcurl"
 export PATH="$(dirname "$exe"):$PATH"
 compiler="$(scripts/select-compiler.sh)"

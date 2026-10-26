@@ -71,16 +71,35 @@ endif()
 if(NOT EXISTS "${CMAKE_SOURCE_DIR}/third_party/zlib/CMakeLists.txt")
   message(FATAL_ERROR "third_party/zlib missing; run scripts/sync-deps.sh")
 endif()
-set(ZLIB_BUILD_TESTING OFF CACHE BOOL "" FORCE)
-add_subdirectory(third_party/zlib EXCLUDE_FROM_ALL)
-target_include_directories(zlibstatic PUBLIC "${CMAKE_SOURCE_DIR}/third_party/zlib" "${CMAKE_BINARY_DIR}/third_party/zlib")
-if(NOT TARGET ZLIB::ZLIB)
-  add_library(ZLIB::ZLIB ALIAS zlibstatic)
+# curl uses ZLIB::ZLIB in configure-time try_compile checks. A build-tree
+# ALIAS cannot be imported into that scratch project, so build the tiny pinned
+# archive first and expose a genuine imported target with an absolute path.
+set(ZLIB_BUILD_DIR "${CMAKE_BINARY_DIR}/deps/zlib-build")
+execute_process(COMMAND "${CMAKE_COMMAND}" -S "${CMAKE_SOURCE_DIR}/third_party/zlib"
+  -B "${ZLIB_BUILD_DIR}" -G "${CMAKE_GENERATOR}"
+  -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+  -DZLIB_BUILD_EXAMPLES=OFF
+  RESULT_VARIABLE ZLIB_CONFIG_RESULT TIMEOUT 120
+  OUTPUT_FILE "${CMAKE_BINARY_DIR}/zlib-config.log" ERROR_FILE "${CMAKE_BINARY_DIR}/zlib-config-errors.log")
+if(NOT ZLIB_CONFIG_RESULT EQUAL 0)
+  message(FATAL_ERROR "vendored zlib configure failed (${ZLIB_CONFIG_RESULT})")
 endif()
+execute_process(COMMAND "${CMAKE_COMMAND}" --build "${ZLIB_BUILD_DIR}" --target zlibstatic --parallel 2
+  RESULT_VARIABLE ZLIB_BUILD_RESULT TIMEOUT 120
+  OUTPUT_FILE "${CMAKE_BINARY_DIR}/zlib-build.log" ERROR_FILE "${CMAKE_BINARY_DIR}/zlib-build-errors.log")
+if(NOT ZLIB_BUILD_RESULT EQUAL 0)
+  message(FATAL_ERROR "vendored zlib build failed (${ZLIB_BUILD_RESULT})")
+endif()
+set(ZLIB_LIBRARY "${ZLIB_BUILD_DIR}/libz.a" CACHE FILEPATH "" FORCE)
+set(ZLIB_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/third_party/zlib" CACHE PATH "" FORCE)
+add_library(ZLIB::ZLIB STATIC IMPORTED GLOBAL)
+set_target_properties(ZLIB::ZLIB PROPERTIES IMPORTED_LOCATION "${ZLIB_LIBRARY}"
+  INTERFACE_INCLUDE_DIRECTORIES "${ZLIB_INCLUDE_DIR};${ZLIB_BUILD_DIR}")
 if(NOT APPLE AND NOT WIN32)
   # nghttp2's CMake build has a library-only mode; the CLI and examples are
   # excluded so only the MIT static library is linked into libcurl.
   set(BUILD_STATIC_LIBS ON CACHE BOOL "" FORCE)
+  set(WITH_LIBXML2 OFF CACHE BOOL "" FORCE)
   set(ENABLE_LIB_ONLY ON CACHE BOOL "" FORCE)
   set(ENABLE_APP OFF CACHE BOOL "" FORCE)
   set(ENABLE_ASIO_LIB OFF CACHE BOOL "" FORCE)
@@ -99,7 +118,7 @@ if(NOT APPLE AND NOT WIN32)
   set(LIBXML2_WITH_ZLIB OFF CACHE BOOL "" FORCE)
   set(LIBXML2_WITH_LZMA OFF CACHE BOOL "" FORCE)
   set(LIBXML2_WITH_MODULES OFF CACHE BOOL "" FORCE)
-set(LIBXML2_WITH_PYTHON OFF CACHE BOOL "" FORCE)
+  set(LIBXML2_WITH_PYTHON OFF CACHE BOOL "" FORCE)
   set(LIBXML2_WITH_PROGRAMS OFF CACHE BOOL "" FORCE)
   set(LIBXML2_WITH_TESTS OFF CACHE BOOL "" FORCE)
   set(LIBXML2_WITH_HTML ON CACHE BOOL "" FORCE)
@@ -143,7 +162,6 @@ if(APPLE OR WIN32)
 endif()
 set(CURL_ZLIB ON CACHE BOOL "" FORCE)
 set(ZLIB_USE_STATIC_LIBS ON CACHE BOOL "" FORCE)
-set(ZLIB_LIBRARY zlibstatic CACHE STRING "" FORCE)
 set(ZLIB_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/third_party/zlib" CACHE PATH "" FORCE)
 set(CURL_BROTLI OFF CACHE BOOL "" FORCE)
 set(CURL_ZSTD OFF CACHE BOOL "" FORCE)

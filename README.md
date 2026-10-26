@@ -9,7 +9,7 @@ Scriptable HTTP, REST and LLM checks in one MIT lmscript host. The examples use 
 | ![Cookies](docs/images/cookie_jar.png) | [Cookie jar](examples/cookie_jar.lms): preserve cookies between requests. `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/cookie_jar.lms` |
 | ![JSON contract](docs/images/json_contract.png) | [JSON Schema](examples/json_contract.lms): validate a response contract. `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/json_contract.lms` |
 | ![Latency](docs/images/load_latency.png) | [Load latency](examples/load_latency.lms): bounded concurrent requests and p95 timing. `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/load_latency.lms` |
-| ![LLM matrix](docs/images/llm_matrix.png) | [LLM matrix](examples/llm_matrix.lms): compare models offline through cassettes. `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/llm_matrix.lms` |
+| ![LLM matrix](docs/images/llm_matrix.png) | [LLM matrix](examples/llm_matrix.lms): compare prompt contracts across three mock models. `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/llm_matrix.lms` |
 
 The remaining gallery captions are directly runnable from an empty directory:
 
