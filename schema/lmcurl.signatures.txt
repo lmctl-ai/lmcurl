@@ -104,6 +104,7 @@ method Matrix.at(int) -> Result
 method Matrix.csv(string) -> void
 method Matrix.len() -> int
 method Matrix.pass_rate(string) -> float
+method Mock.serve(string, string, int) -> void
 method Mock.stop() -> void
 method Mock.url() -> string
 method Provider.chat(string) -> Chat

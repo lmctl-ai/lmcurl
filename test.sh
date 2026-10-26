@@ -37,6 +37,7 @@ python3 scripts/check-linux-linkage.py "$exe"
 mkdir -p build/tests
 for source in tests/*.lms; do timeout 60 "$compiler" "$source"; done
 timeout 60 scripts/test-memory-budget.sh
+LMCURL_HOST="$exe" timeout 60 python3 scripts/test-mock-serve.py
 python3 scripts/test-native.py --host "$exe"
 if [[ "${LMCURL_TEST_NETWORK:-0}" == 1 ]] || command -v lmplot >/dev/null; then
  timeout 1500 python3 scripts/test-examples.py --host "$exe" --render
@@ -58,4 +59,4 @@ set +e
 set -e
 [[ "$status" == 3 ]]; grep -q 'memory budget exceeded' "$BUILD_DIR/budget.err"; grep -q 'LMCURL_MAX_MEMORY_MB' "$BUILD_DIR/budget.err"
 python3 scripts/check-secrets.py --artifacts
-echo 'PASS: pins, static dependencies/dynamic glibc, exact schema/notices, four DSL suites, 28 native scenarios, gallery and default memory budget'
+echo 'PASS: pins, static dependencies/dynamic glibc, exact schema/notices, five DSL suites, 28 native scenarios, gallery and default memory budget'

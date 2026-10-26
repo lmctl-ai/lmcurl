@@ -7,9 +7,12 @@
 #include <algorithm>
 #include <atomic>
 #include <cstring>
+#include <filesystem>
 #include <deque>
 #include <condition_variable>
 #include <thread>
+#include <filesystem>
+#include <fstream>
 #include <zlib.h>
 namespace lmcurl {
 namespace {
@@ -218,7 +221,199 @@ struct MockState {
     int status = 200;
     std::string content_type = "application/json", extra, payload;
     Json result;
-    if (path.rfind("/bytes/", 0) == 0) {
+    // Deterministic web fixtures used by lmcurl+lmhtml examples.  They are
+    // deliberately served by the loopback mock so parser examples never
+    // depend on a network or a mutable external site.
+    if (path == "/site/index.html") {
+      content_type = "text/html";
+      payload =
+          "<!doctype html><html><head><title>Fixture site</title></head><body><h1>Fixture site</h1>"
+          "<a href=\"/site/about.html\">About</a><a href=\"/site/products.html\">Products</a>"
+          "<a href=\"/site/missing.html\">Missing</a><a "
+          "href=\"/site/private/secret.html\">Private</a></body></html>";
+    } else if (path == "/site/about.html") {
+      content_type = "text/html";
+      payload =
+          "<!doctype html><html><head><title>About "
+          "fixture</title></head><body><h1>About</h1><p>Offline fixture site.</p></body></html>";
+    } else if (path == "/site/products.html") {
+      content_type = "text/html";
+      payload =
+          "<!doctype "
+          "html><html><head><title>Products</title></head><body><h1>Products</"
+          "h1><table><tr><th>SKU</th><th>Price</th><th>Stock</th></tr>"
+          "<tr><td>orbit</td><td>19.50</td><td>8</td></tr><tr><td>comet</td><td>29.00</td><td>0</"
+          "td></tr><tr><td>nova</td><td>12.00</td><td>4</td></tr></table></body></html>";
+    } else if (path == "/site/api/products.json") {
+      result = {{"products",
+                 {{{"sku", "orbit"}, {"price", 19.50}, {"stock", 8}},
+                  {{"sku", "comet"}, {"price", 29.00}, {"stock", 0}},
+                  {{"sku", "nova"}, {"price", 12.00}, {"stock", 4}}}}};
+    } else if (path == "/site/sitemap.xml") {
+      content_type = "application/xml";
+      auto origin = "http://127.0.0.1:" + std::to_string(port);
+      payload =
+          "<?xml version=\"1.0\"?><urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">";
+      for (const auto *route : {"/site/index.html", "/site/about.html", "/site/products.html"})
+        payload += "<url><loc>" + origin + route + "</loc></url>";
+      payload += "</urlset>";
+    } else if (path == "/site/feed.rss") {
+      content_type = "application/rss+xml";
+      auto origin = "http://127.0.0.1:" + std::to_string(port);
+      payload =
+          "<?xml version=\"1.0\"?><rss version=\"2.0\"><channel><title>Fixture feed</title><link>" +
+          origin + "/site/index.html</link><description>Offline observatory news</description>";
+      payload +=
+          "<item><title>Orbit launch</title><link>" + origin +
+          "/site/articles/orbit</link><guid isPermaLink=\"true\">" + origin +
+          "/site/articles/orbit</guid><pubDate>Mon, 01 Jan 2024 00:00:00 GMT</pubDate></item>";
+      payload += "<item><title>Comet watch</title><link>" + origin +
+                 "/site/articles/comet</link><guid isPermaLink=\"true\">" + origin +
+                 "/site/articles/comet</guid><pubDate>Tue, 02 Jan 2024 00:00:00 "
+                 "GMT</pubDate></item></channel></rss>";
+    } else if (path == "/site/feed.atom") {
+      content_type = "application/atom+xml";
+      auto origin = "http://127.0.0.1:" + std::to_string(port);
+      payload = "<?xml version=\"1.0\"?><feed xmlns=\"http://www.w3.org/2005/Atom\"><title>Fixture "
+                "Atom</title><id>" +
+                origin +
+                "/site/feed.atom</id><updated>2024-01-02T00:00:00Z</updated><author><name>Fixture "
+                "editor</name></author>";
+      payload += "<entry><title>Orbit launch</title><link href=\"" + origin +
+                 "/site/articles/orbit\"/><id>" + origin +
+                 "/site/articles/orbit</id><updated>2024-01-01T00:00:00Z</updated></entry>";
+      payload += "<entry><title>Comet watch</title><link href=\"" + origin +
+                 "/site/articles/comet\"/><id>" + origin +
+                 "/site/articles/comet</id><updated>2024-01-02T00:00:00Z</updated></entry></feed>";
+    } else if (path == "/site/articles/orbit" || path == "/site/articles/comet") {
+      content_type = "text/html";
+      payload = "<html><head><title>Observatory news</title></head><body><article><h1>" +
+                path.substr(15) + "</h1><p>Offline news.</p></article></body></html>";
+    } else if (path == "/site/login.html") {
+      content_type = "text/html";
+      payload = "<!doctype html><html><body><form action=\"/site/login\" method=\"post\"><input "
+                "type=\"hidden\" name=\"csrf_token\" value=\"fixture-csrf-public\"><input "
+                "name=\"username\"><input name=\"password\" type=\"password\"><button>Sign "
+                "in</button></form></body></html>";
+    } else if (path == "/site/login" && verb == "POST") {
+      auto form = pairs(body);
+      if (form.value("csrf_token", "") == "fixture-csrf-public" &&
+          form.value("username", "") == "demo" && form.value("password", "") == "demo") {
+        extra = "Set-Cookie: site_session=fixture-site-session; Path=/; HttpOnly\r\n";
+        result = {{"ok", true}};
+      } else {
+        status = 403;
+        result = {{"ok", false}};
+      }
+    } else if (path == "/site/account.html") {
+      content_type = "text/html";
+      if (pairs(headers.value("cookie", std::string()), ';').value("site_session", "") !=
+          "fixture-site-session") {
+        status = 401;
+        payload = "<html><body>Unauthorized</body></html>";
+      } else
+        payload = "<html><head><title>Account</title></head><body><h1>Demo account</h1><p "
+                  "class=\"balance\">42.00</p></body></html>";
+    } else if (path == "/site/page/1.html" || path == "/site/page/2.html" ||
+               path == "/site/page/3.html") {
+      content_type = "text/html";
+      int page = std::stoi(path.substr(11));
+      int start = (page - 1) * 3 + 1;
+      payload = "<html><body><h1>Articles page " + std::to_string(page) + "</h1>";
+      for (int i = 0; i < 3; ++i)
+        payload += "<article><h2>Article " + std::to_string(start + i) +
+                   "</h2><p>Offline content.</p></article>";
+      if (page < 3)
+        payload +=
+            "<a rel=\"next\" href=\"/site/page/" + std::to_string(page + 1) + ".html\">Next</a>";
+      payload += "</body></html>";
+    } else if (path == "/site/assets/site.css") {
+      content_type = "text/css";
+      payload = "body{font-family:sans-serif}.item{color:#345}";
+    } else if (path == "/site/assets/logo.svg") {
+      content_type = "image/svg+xml";
+      payload = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"40\" height=\"20\"><rect "
+                "width=\"40\" height=\"20\" fill=\"#345\"/></svg>";
+    } else if (path == "/site/assets/app.js") {
+      content_type = "text/javascript";
+      payload = "console.log('fixture');";
+    } else if (path == "/site/assets/missing.png") {
+      status = 404;
+      content_type = "image/png";
+      payload = "";
+    } else if (path == "/site/redirect/a") {
+      status = 302;
+      extra = "Location: /site/redirect/b\r\n";
+      result = {{"redirect", "a"}};
+    } else if (path == "/site/redirect/b") {
+      status = 301;
+      extra = "Location: /site/about.html\r\n";
+      result = {{"redirect", "b"}};
+    } else if (path == "/site/seo.html") {
+      content_type = "text/html";
+      payload = "<html><head><title>SEO fixture</title></head><body><h1>One</h1><h1>Two</h1><img "
+                "alt=\"logo\" src=\"/site/assets/logo.svg\"><img "
+                "src=\"/site/assets/missing.png\"></body></html>";
+    } else if (path == "/site/a11y.html") {
+      content_type = "text/html";
+      payload = "<html><body><input><button></button><img src=\"/site/assets/logo.svg\"><a "
+                "href=\"/site/about.html\"></a></body></html>";
+    } else if (path == "/site/metadata.html") {
+      content_type = "text/html";
+      payload = "<html><head><meta property=\"og:title\" content=\"Fixture metadata\"><meta "
+                "property=\"og:image\" content=\"/site/assets/logo.svg\"><script "
+                "type=\"application/ld+json\">{\"@context\":\"https://"
+                "schema.org\",\"@type\":\"Article\",\"headline\":\"Fixture\"}</script></"
+                "head><body><h1>Metadata</h1></body></html>";
+    } else if (path == "/site/forms.html") {
+      content_type = "text/html";
+      payload = "<html><body><form action=\"/site/search\" method=\"get\"><input "
+                "name=\"q\"><button>Search</button></form><form action=\"/site/contact\" "
+                "method=\"post\"><input name=\"email\"><textarea "
+                "name=\"message\"></textarea><button>Send</button></form></body></html>";
+    } else if (path == "/site/robots.txt") {
+      content_type = "text/plain";
+      payload = "User-agent: *\nDisallow: /site/private/\nCrawl-delay: 0.02\n";
+    } else if (path == "/site/private/secret.html") {
+      status = 403;
+      content_type = "text/html";
+      payload = "<html><body>fixture private area</body></html>";
+    } else if (path == "/site/changes.html") {
+      content_type = "text/html";
+      int count;
+      {
+        std::lock_guard<std::mutex> lock(mutex);
+        count = ++counters[path];
+      }
+      payload = "<html><body><h1>Changes</h1><p>version " + std::to_string(std::min(count, 2)) +
+                "</p></body></html>";
+    } else if (path == "/site/watch.html") {
+      content_type = "text/html";
+      int count;
+      {
+        std::lock_guard<std::mutex> lock(mutex);
+        count = ++counters[path];
+      }
+      int price = count == 1 ? 25 : count == 2 ? 22 : 19;
+      int stock = count < 3 ? 0 : 3;
+      payload = "<html><body><span class=\"price\">" + std::to_string(price) +
+                "</span><span class=\"stock\">" + std::to_string(stock) + "</span></body></html>";
+    } else if (path == "/site/mirror.html") {
+      content_type = "text/html";
+      payload =
+          "<html><head><link rel=\"stylesheet\" href=\"/site/assets/site.css\"><script "
+          "src=\"/site/assets/app.js\"></script></head><body><img src=\"/site/assets/logo.svg\"><a "
+          "href=\"/site/about.html\">About</a></body></html>";
+    } else if (path == "/site/audit.html") {
+      content_type = "text/html";
+      payload = "<html><body><img alt=\"logo\" src=\"/site/assets/logo.svg\"><img "
+                "src=\"/site/assets/missing.png\"><a "
+                "href=\"/site/redirect/a\">redirect</a></body></html>";
+    } else if (path.rfind("/site/", 0) == 0) {
+      status = 404;
+      content_type = "text/html";
+      payload = "<html><body>Not found</body></html>";
+    } else if (path.rfind("/bytes/", 0) == 0) {
       int n = std::clamp(std::stoi(path.substr(7)), 0, 1048576);
       payload = std::string(n, 'x');
       content_type = "application/octet-stream";
@@ -284,8 +479,8 @@ struct MockState {
         result = {{"ok", false}};
       }
     } else if (path == "/protected") {
-      bool ok = headers.value("cookie", std::string()).find("session=fixture-session") !=
-                    std::string::npos ||
+      bool ok = pairs(headers.value("cookie", std::string()), ';').value("session", "") ==
+                    "fixture-session" ||
                 headers.value("authorization", std::string()) == "Bearer fixture-token";
       status = ok ? 200 : 401;
       result = {{"authorized", ok}};
@@ -328,8 +523,7 @@ struct MockState {
           Json first_delta = {{"index", 0},
                               {"id", "call_1"},
                               {"type", "function"},
-                              {"function", {{"name", "lookup"},
-                                             {"arguments", "{\"city\":\""}}}};
+                              {"function", {{"name", "lookup"}, {"arguments", "{\"city\":\""}}}};
           first["choices"].push_back({{"delta", {{"tool_calls", Json::array({first_delta})}}}});
           Json second = {{"choices", Json::array()}};
           Json second_delta = {{"index", 0}, {"function", {{"arguments", "Paris\"}"}}}};
@@ -339,15 +533,15 @@ struct MockState {
           payload = "data: " + first.dump() + "\n\ndata: " + second.dump() +
                     "\n\ndata: " + usage.dump() + "\n\ndata: [DONE]\n\n";
         } else {
-          payload =
-              "data: " +
-              Json({{"model", model}, {"choices", Json::array({{{"delta", {{"content", answer}}}}})}})
-                  .dump() +
-              "\n\ndata: " +
-              Json({{"choices", Json::array()},
-                    {"usage", {{"prompt_tokens", 4}, {"completion_tokens", 3}}}})
-                  .dump() +
-              "\n\ndata: [DONE]\n\n";
+          payload = "data: " +
+                    Json({{"model", model},
+                          {"choices", Json::array({{{"delta", {{"content", answer}}}}})}})
+                        .dump() +
+                    "\n\ndata: " +
+                    Json({{"choices", Json::array()},
+                          {"usage", {{"prompt_tokens", 4}, {"completion_tokens", 3}}}})
+                        .dump() +
+                    "\n\ndata: [DONE]\n\n";
         }
       } else
         result = {
@@ -420,4 +614,27 @@ Mock::Mock(Runtime *r) : runtime(r), state(std::make_unique<MockState>(r)) {}
 Mock::~Mock() = default;
 std::string Mock::url() const { return "http://127.0.0.1:" + std::to_string(state->port); }
 void Mock::stop() { state->stop(); }
+void Mock::serve(const std::string &ready_file, const std::string &stop_file, int64_t timeout_ms) {
+  if (ready_file.empty() || stop_file.empty() || timeout_ms < 1 || timeout_ms > 120000)
+    throw dslvm::Error("mock serve requires non-empty paths and timeout 1..120000 ms");
+  if (ready_file == stop_file || state->stopping)
+    throw dslvm::Error("mock serve paths must differ and server must be running");
+  auto temporary = ready_file + ".tmp";
+  runtime->write(temporary, url() + "\n");
+  std::error_code ec;
+  std::filesystem::rename(temporary, ready_file, ec);
+  if (ec)
+    throw dslvm::Error("mock serve cannot publish ready file: " + ec.message());
+  auto deadline = Clock::now() + std::chrono::milliseconds(timeout_ms);
+  while (!state->stopping && Clock::now() < deadline) {
+    if (std::filesystem::exists(stop_file)) {
+      stop();
+      return;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  }
+  stop();
+  if (!std::filesystem::exists(stop_file))
+    throw dslvm::Error("mock serve timed out waiting for stop file");
+}
 } // namespace lmcurl

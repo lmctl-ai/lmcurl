@@ -1,0 +1,42 @@
+mkdir("build/web-mock");
+p = _dsl_ cli="lmcurl" install="github:lmctl-ai/lmcurl@latest";
+let m=curl.mock(); let s=curl.session(m.url());
+let products=s.get("/site/products.html").send();
+let api=s.get("/site/api/products.json").send();
+let feed=s.get("/site/feed.rss").send();
+let login=s.get("/site/login.html").send();
+let robots=s.get("/site/robots.txt").send();
+let missing=s.get("/site/missing.html").send();
+let bad=s.post("/site/login").form("csrf_token","wrong").form("username","demo").form("password","demo").send();
+let good=s.post("/site/login").form("csrf_token","fixture-csrf-public").form("username","demo").form("password","demo").send();
+let account=s.get("/site/account.html").send();
+assert_eq(curl.session(m.url()).get("/protected").header("Cookie","not_session=fixture-session").send().status(),401);
+assert_eq(curl.session(m.url()).get("/site/account.html").header("Cookie","not_site_session=fixture-site-session").send().status(),401);
+assert_eq(s.get("/site/page/1.html").send().status(),200);
+assert_eq(s.get("/site/page/3.html").send().status(),200);
+assert_eq(s.get("/site/page/99.html").send().status(),404);
+let anonymous=curl.session(m.url()).get("/site/account.html").send();
+assert_eq(products.status(),200); assert_eq(api.status(),200); assert_eq(feed.status(),200); assert_eq(login.status(),200); assert_eq(robots.status(),200);
+assert_eq(missing.status(),404); assert_eq(bad.status(),403); assert_eq(good.status(),200); assert_eq(account.status(),200); assert_eq(anonymous.status(),401);
+file_write("build/web-mock/products.html",products.body()); file_write("build/web-mock/feed.rss",feed.body());
+file_write("build/web-mock/login.html",login.body()); file_write("build/web-mock/robots.txt",robots.body());
+m.stop();
+end _dsl_
+savedsl(p,"build/web-mock/lmcurl.dslb");
+r = system ${dsl_cli(p)} --dsl build/web-mock/lmcurl.dslb;
+assert(r.code==0);
+q = _dsl_ cli="lmhtml" install="github:lmctl-ai/lmhtml@latest";
+let products=html.parse(file_read("build/web-mock/products.html"));
+let feed=html.parse(file_read("build/web-mock/feed.rss"));
+let login=html.parse(file_read("build/web-mock/login.html"));
+if (products.title()!="Products") { report.add("title","products",1,"wrong title"); }
+if (products.select("table tr").len()!=4) { report.add("rows","products",1,"wrong table rows"); }
+if (feed.select("item").len()!=2) { report.add("items","feed",1,"wrong item count"); }
+if (feed.select("item title").at(0).text()!="Orbit launch") { report.add("title","feed",1,"wrong first title"); }
+if (login.select("input[name=csrf_token]").at(0).attr("value")!="fixture-csrf-public") { report.add("csrf","login",1,"wrong token"); }
+report.fail_if_any();
+end _dsl_
+savedsl(q,"build/web-mock/lmhtml.dslb");
+r2 = system ${dsl_cli(q)} --dsl build/web-mock/lmhtml.dslb;
+assert(r2.code==0);
+println("PASS lmcurl mock fixtures downloaded and lmhtml parsed HTML/RSS/login/robots");

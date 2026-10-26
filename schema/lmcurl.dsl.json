@@ -328,6 +328,16 @@
     },
     "Mock": {
       "methods": {
+        "serve": [
+          {
+            "params": [
+              "string",
+              "string",
+              "int"
+            ],
+            "returns": "void"
+          }
+        ],
         "stop": [
           {
             "params": [],

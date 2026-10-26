@@ -99,6 +99,7 @@ struct Mock {
   ~Mock();
   std::string url() const;
   void stop();
+  void serve(const std::string &ready_file, const std::string &stop_file, int64_t timeout_ms);
 };
 void transport_init();
 void register_http(dslvm::Registry &, Runtime &);

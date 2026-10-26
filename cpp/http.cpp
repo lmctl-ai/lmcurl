@@ -487,6 +487,10 @@ void register_http(dslvm::Registry &r, Runtime &rt) {
     static_cast<Mock *>(p)->stop();
     return Value::none();
   });
+  method(r, rt, "Mock", "serve", {"string", "string", "int"}, "void", [](void *p, Args &a) {
+    static_cast<Mock *>(p)->serve(a[0].s, a[1].s, a[2].i);
+    return Value::none();
+  });
   method(r, rt, "Session", "request", {"string", "string"}, "Request", [&rt](void *p, Args &a) {
     return Value::object("Request", rt.hold<Request>(static_cast<Session *>(p), a[0].s, a[1].s));
   });
