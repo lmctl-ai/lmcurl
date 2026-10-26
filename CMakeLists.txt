@@ -46,7 +46,7 @@ if(NOT APPLE AND NOT WIN32)
   if(NOT EXISTS "${OPENSSL_PREFIX}/lib64/libssl.a")
     file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/deps/openssl-build")
     execute_process(COMMAND "${PERL_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/third_party/openssl/Configure"
-      ${OPENSSL_TARGET} no-shared no-module no-dso no-tests --prefix=${OPENSSL_PREFIX} --openssldir=/etc/ssl
+      ${OPENSSL_TARGET} no-shared no-module no-dso no-tests --prefix=${OPENSSL_PREFIX} --libdir=lib64 --openssldir=/etc/ssl
       WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/deps/openssl-build"
       RESULT_VARIABLE OPENSSL_CONFIGURE_RESULT TIMEOUT 120 OUTPUT_FILE "${CMAKE_BINARY_DIR}/openssl-configure.log" ERROR_FILE "${CMAKE_BINARY_DIR}/openssl-configure-errors.log")
     if(NOT OPENSSL_CONFIGURE_RESULT EQUAL 0)
