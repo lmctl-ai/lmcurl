@@ -5,21 +5,21 @@ Download with upstream libcurl, parse with lmhtml, and turn asserted results int
 | Mirror parsed HTML, stylesheet, script and image dependencies | Poll until the price is at most 20 USD and stock is positive |
 | --- | --- |
 | ![Mirror parsed HTML, stylesheet, script and image dependencies](docs/images/web_site_mirror.png) | ![Poll until the price is at most 20 USD and stock is positive](docs/images/web_price_watcher.png) |
-| `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_site_mirror.lms` | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_price_watcher.lms` |
+| `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_site_mirror.lms` | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_price_watcher.lms` |
 
 | Scrape the product table into a price and stock CSV | Check discovered site links and report missing or denied targets |
 | --- | --- |
 | ![Scrape the product table into a price and stock CSV](docs/images/web_table_scraper.png) | ![Check discovered site links and report missing or denied targets](docs/images/web_link_checker.png) |
-| `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_table_scraper.lms` | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_link_checker.lms` |
+| `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_table_scraper.lms` | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_link_checker.lms` |
 
 | A second crawl changes content; a third crawl stays stable | Parse the CSRF field, post credentials and retain the login cookie |
 | --- | --- |
 | ![A second crawl changes content; a third crawl stays stable](docs/images/web_content_diff.png) | ![Parse the CSRF field, post credentials and retain the login cookie](docs/images/web_login_form.png) |
-| `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_content_diff.lms` | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_login_form.lms` |
+| `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_content_diff.lms` | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_login_form.lms` |
 
 ```sh
 npm install -g @lmctl-ai/lmctl@0.2.420
-lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_site_mirror.lms
+lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_site_mirror.lms
 ```
 
 The **16 new downloader/parser stories** run against lmcurl’s native loopback mock site. lmcurl performs HTTP; lmhtml v0.7.4 selects elements and attributes, extracts rows, and compares documents. CSV/text/JSON files pass values between the hosts. The mirror writes `mirror/index.html`, local assets and `about.html`; every story writes `images/<name>.png` and reports under `reports/`. Host installation needs GitHub access once; the example workloads use only localhost.
@@ -30,27 +30,27 @@ The **16 new downloader/parser stories** run against lmcurl’s native loopback 
 | Parse an XML sitemap, scope its URLs, then crawl them | Read RSS and Atom headlines, publication dates and URLs |
 | --- | --- |
 | ![Parse an XML sitemap, scope its URLs, then crawl them](docs/images/web_sitemap_crawler.png) | ![Read RSS and Atom headlines, publication dates and URLs](docs/images/web_feed_reader.png) |
-| `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_sitemap_crawler.lms` | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_feed_reader.lms` |
+| `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_sitemap_crawler.lms` | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_feed_reader.lms` |
 
 | Follow parsed next links to collect nine articles | SEO audit: metadata, headings and image alternatives |
 | --- | --- |
 | ![Follow parsed next links to collect nine articles](docs/images/web_pagination.png) | ![SEO audit: metadata, headings and image alternatives](docs/images/web_seo_audit.png) |
-| `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_pagination.lms` | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_seo_audit.lms` |
+| `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_pagination.lms` | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_seo_audit.lms` |
 
 | Find broken image URLs and follow every redirect hop | Compare each product SKU, price and stock with the API |
 | --- | --- |
 | ![Find broken image URLs and follow every redirect hop](docs/images/web_image_redirect_audit.png) | ![Compare each product SKU, price and stock with the API](docs/images/web_api_html_consistency.png) |
-| `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_image_redirect_audit.lms` | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_api_html_consistency.lms` |
+| `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_image_redirect_audit.lms` | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_api_html_consistency.lms` |
 
 | Scan basic labels, image alternatives and empty controls | Extract and inspect JSON-LD and OpenGraph fields |
 | --- | --- |
 | ![Scan basic labels, image alternatives and empty controls](docs/images/web_accessibility_scan.png) | ![Extract and inspect JSON-LD and OpenGraph fields](docs/images/web_metadata_extractor.png) |
-| `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_accessibility_scan.lms` | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_metadata_extractor.lms` |
+| `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_accessibility_scan.lms` | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_metadata_extractor.lms` |
 
 | Inventory form actions, methods and named controls | Respect robots exclusions and wait between allowed requests |
 | --- | --- |
 | ![Inventory form actions, methods and named controls](docs/images/web_form_inventory.png) | ![Respect robots exclusions and wait between allowed requests](docs/images/web_robots_crawler.png) |
-| `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_form_inventory.lms` | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_robots_crawler.lms` |
+| `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_form_inventory.lms` | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_robots_crawler.lms` |
 
 </details>
 
@@ -64,54 +64,54 @@ The robots example implements the fixture’s `User-agent: *`, `Disallow` prefix
 
 | Story | Run from an empty directory |
 | --- | --- |
-| A user record through its complete lifecycle | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/rest_crud.lms` |
-| Login capture unlocks a protected resource | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/login_session.lms` |
-| A session keeps cookies across requests | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/cookie_jar.lms` |
-| Anonymous and authenticated access | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/auth_boundary.lms` |
-| Following a bounded redirect chain | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/redirect_chain.lms` |
-| Recovery after three transient failures | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/retry_recovery.lms` |
-| Poll assertions until the service is ready | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/poll_readiness.lms` |
-| Required fields and collection bounds | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/json_contract.lms` |
-| Typed JSONPath projections and predicates | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/jsonpath_projection.lms` |
-| XPath checks on an XML catalog | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/xml_catalog.lms` |
-| Extracting HTML with XPath | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/html_extract.lms` |
-| Three CSV rows exercise one request template | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/csv_cases.lms` |
-| JSON data drives a reusable request | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/json_cases.lms` |
-| Select only the smoke contract | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/tag_filter.lms` |
-| Independent checks run concurrently | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/parallel_checks.lms` |
-| A failed contract produces actionable reports | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/failure_reports.lms` |
-| Setup runs before protected checks | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/suite_lifecycle.lms` |
-| Form encoding and multipart upload | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/form_and_upload.lms` |
-| Event-stream data stays bounded and inspectable | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/sse_events.lms` |
-| Compressed responses are decoded before queries | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/compression.lms` |
-| Oversized responses fail their contract | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/response_limits.lms` |
-| Snapshots detect response regressions | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/snapshot_contract.lms` |
-| Check a JSON OpenAPI response contract | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/openapi_contract.lms` |
-| Virtual users and latency thresholds | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/load_latency.lms` |
-| A prompt regression is an ordinary assertion | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/llm_prompt.lms` |
-| Both OpenAI and Ollama streaming fixtures | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/llm_streams.lms` |
-| Sampling reports measured prompt pass rates | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/llm_sampling.lms` |
-| A model matrix compares one prompt side by side | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/llm_matrix.lms` |
-| Recorded completions replay without credentials | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/llm_replay.lms` |
-| Structured completions have schema contracts | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/llm_json.lms` |
-| Where a delayed response spends its time | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/timing_breakdown.lms` |
-| Credentials stay out of saved artifacts | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/secret_redaction.lms` |
-| Check discovered site links and report missing or denied targets | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_link_checker.lms` |
-| Parse an XML sitemap, scope its URLs, then crawl them | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_sitemap_crawler.lms` |
-| Read RSS and Atom headlines, publication dates and URLs | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_feed_reader.lms` |
-| Scrape the product table into a price and stock CSV | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_table_scraper.lms` |
-| Poll until the price is at most 20 USD and stock is positive | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_price_watcher.lms` |
-| Parse the CSRF field, post credentials and retain the login cookie | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_login_form.lms` |
-| Follow parsed next links to collect nine articles | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_pagination.lms` |
-| Mirror parsed HTML, stylesheet, script and image dependencies | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_site_mirror.lms` |
-| SEO audit: metadata, headings and image alternatives | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_seo_audit.lms` |
-| Find broken image URLs and follow every redirect hop | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_image_redirect_audit.lms` |
-| Compare each product SKU, price and stock with the API | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_api_html_consistency.lms` |
-| A second crawl changes content; a third crawl stays stable | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_content_diff.lms` |
-| Scan basic labels, image alternatives and empty controls | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_accessibility_scan.lms` |
-| Extract and inspect JSON-LD and OpenGraph fields | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_metadata_extractor.lms` |
-| Inventory form actions, methods and named controls | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_form_inventory.lms` |
-| Respect robots exclusions and wait between allowed requests | `lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_robots_crawler.lms` |
+| A user record through its complete lifecycle | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/rest_crud.lms` |
+| Login capture unlocks a protected resource | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/login_session.lms` |
+| A session keeps cookies across requests | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/cookie_jar.lms` |
+| Anonymous and authenticated access | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/auth_boundary.lms` |
+| Following a bounded redirect chain | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/redirect_chain.lms` |
+| Recovery after three transient failures | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/retry_recovery.lms` |
+| Poll assertions until the service is ready | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/poll_readiness.lms` |
+| Required fields and collection bounds | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/json_contract.lms` |
+| Typed JSONPath projections and predicates | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/jsonpath_projection.lms` |
+| XPath checks on an XML catalog | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/xml_catalog.lms` |
+| Extracting HTML with XPath | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/html_extract.lms` |
+| Three CSV rows exercise one request template | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/csv_cases.lms` |
+| JSON data drives a reusable request | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/json_cases.lms` |
+| Select only the smoke contract | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/tag_filter.lms` |
+| Independent checks run concurrently | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/parallel_checks.lms` |
+| A failed contract produces actionable reports | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/failure_reports.lms` |
+| Setup runs before protected checks | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/suite_lifecycle.lms` |
+| Form encoding and multipart upload | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/form_and_upload.lms` |
+| Event-stream data stays bounded and inspectable | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/sse_events.lms` |
+| Compressed responses are decoded before queries | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/compression.lms` |
+| Oversized responses fail their contract | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/response_limits.lms` |
+| Snapshots detect response regressions | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/snapshot_contract.lms` |
+| Check a JSON OpenAPI response contract | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/openapi_contract.lms` |
+| Virtual users and latency thresholds | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/load_latency.lms` |
+| A prompt regression is an ordinary assertion | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/llm_prompt.lms` |
+| Both OpenAI and Ollama streaming fixtures | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/llm_streams.lms` |
+| Sampling reports measured prompt pass rates | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/llm_sampling.lms` |
+| A model matrix compares one prompt side by side | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/llm_matrix.lms` |
+| Recorded completions replay without credentials | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/llm_replay.lms` |
+| Structured completions have schema contracts | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/llm_json.lms` |
+| Where a delayed response spends its time | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/timing_breakdown.lms` |
+| Credentials stay out of saved artifacts | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/secret_redaction.lms` |
+| Check discovered site links and report missing or denied targets | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_link_checker.lms` |
+| Parse an XML sitemap, scope its URLs, then crawl them | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_sitemap_crawler.lms` |
+| Read RSS and Atom headlines, publication dates and URLs | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_feed_reader.lms` |
+| Scrape the product table into a price and stock CSV | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_table_scraper.lms` |
+| Poll until the price is at most 20 USD and stock is positive | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_price_watcher.lms` |
+| Parse the CSRF field, post credentials and retain the login cookie | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_login_form.lms` |
+| Follow parsed next links to collect nine articles | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_pagination.lms` |
+| Mirror parsed HTML, stylesheet, script and image dependencies | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_site_mirror.lms` |
+| SEO audit: metadata, headings and image alternatives | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_seo_audit.lms` |
+| Find broken image URLs and follow every redirect hop | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_image_redirect_audit.lms` |
+| Compare each product SKU, price and stock with the API | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_api_html_consistency.lms` |
+| A second crawl changes content; a third crawl stays stable | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_content_diff.lms` |
+| Scan basic labels, image alternatives and empty controls | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_accessibility_scan.lms` |
+| Extract and inspect JSON-LD and OpenGraph fields | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_metadata_extractor.lms` |
+| Inventory form actions, methods and named controls | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_form_inventory.lms` |
+| Respect robots exclusions and wait between allowed requests | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_robots_crawler.lms` |
 
 ## Host API and limits
 
