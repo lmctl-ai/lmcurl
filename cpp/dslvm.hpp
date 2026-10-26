@@ -1,18 +1,18 @@
-// cpp-dsl-sdk: the C++ runtime for lmscript `_dsl_` bytecode. Header-only, C++17, standard library only.
-// Single source of truth: github.com/lmctlhq/cpp-dsl-sdk/include/dslvm.hpp (hosts vendor it by pinned sha256, see README).
+// lmcode-cpp: the C++ runtime for lmscript `_dsl_` bytecode. Header-only, C++17, standard library only.
+// Single source of truth: github.com/lmctl-ai/lmcode-cpp/include/dslvm.hpp (hosts vendor it by pinned sha256, see README).
 //
 // Public API (everything else in this header is an implementation detail):
 //   dslvm::Error                         exception for load, verify and run-time failures: what() names the problem; code is one of
 //                                        LOAD_BAD_BYTECODE, LOAD_SCHEMA_MISMATCH, LOAD_UNBOUND, RUN_ERROR (VM), RUN_HOST (thrown by a host
 //                                        closure), APP_FAIL (the host's own application failure, see report_app_failure)
-//   dslvm::Value                         tagged value: VOID, INT (int64, two's complement), FLOAT (binary64), STR (UTF-8), BOOL, OBJ (host pointer + schema type name)
+//   dslvm::Value                         tagged value: VOID, INT (int64, two's complement), FLOAT (binary64), STR (arbitrary bytes), BOOL, OBJ (host pointer + schema type name)
 //   dslvm::Args                          std::vector<Value> of call arguments, in order
 //   dslvm::Registry                      the implementation of the schema, declared with its types: function(name, {param types}, return
 //                                        type, fn), method(type, name, {param types}, return type, fn), context(name, type); entries are
 //                                        keyed by canonical signature, distinct parameter tuples overload a name, and duplicate parameter
 //                                        tuples are refused; signatures() lists the canonical strings `lmscript --dsl-signatures SCHEMA` prints, so a
-//                                        host test diffs registry and schema (spec v4 S0, a consistency check between two sources of truth,
-//                                        not a run-time defense: R33/R34, the VM checks nothing at call time)
+//                                        host test diffs registry and schema (a consistency check between two sources of truth,
+//                                        not a run-time defense: the VM checks nothing at call time)
 //   dslvm::Context                       the live objects of one run: set(name, pointer)
 //   dslvm::Program::load(bytes, schema, registry)  parses, binds and verifies; throws before anything runs. The Program keeps
 //                                        pointers to entries in that Registry: keep the same Registry alive and unchanged until
@@ -20,13 +20,13 @@
 //   dslvm::Program::run(context, registry)         executes the chunk once; pass the same unchanged Registry used by load()
 //                                        (the argument remains in the public host API); throws dslvm::Error on a run-time failure
 //   dslvm::Program::RunStats             optional dispatch count for host measurements; pass a pointer to run(), never a limit
-//   dslvm::report_ok / report_error / report_app_failure   the standard one-line JSON result on stdout (spec v4 D7, R26) and the
+//   dslvm::report_ok / report_error / report_app_failure   the standard one-line JSON result on stdout and the
 //                                        exit-code convention 2 compile (lmscript) / 3 host (load or run) / 4 application
 //   dslvm::VERSION                       the bytecode format version this SDK reads (and nothing else: no backward compatibility)
 //   dslvm::sha256 / hex / read_file      helpers the hosts use for the schema binding and files
 //
 // Bytecode v5 (big-endian, fixed widths, IEEE-754 binary64): magic "DSLB", u16 version 5, sha256(schema bytes);
-// constants: u32 count, each u8 tag (1 = string) + u32 length + UTF-8; imports: u16 count, each u32 constant index of a canonical
+// constants: u32 count, each u8 tag (1 = string) + u32 length + raw bytes; imports: u16 count, each u32 constant index of a canonical
 // signature (`fn NAME(T1, T2) -> R`, `method Type.name(T1) -> R`) resolved against the registry at load; context: u16 count,
 // each (u32 name constant, u32 type constant) checked against the registry's declarations; locals: u16 count, each (u32 type-name
 // constant, u8 hidden flag); u16 max_stack (the compiler's measured operand-stack depth: the VM reserves it, nothing is checked
@@ -34,15 +34,15 @@
 // Opcodes: enum Op below (PUSH_INT carries an i64, PUSH_STR a u32 constant index, LOAD_CTX a u16 context index, CALL_FN and
 // CALL_METHOD a u16 import index + u8 argc). FOR_RANGE carries counter/end local slots and an exit displacement; FOR_NEXT carries
 // the hidden end slot and a back displacement. WHILE_BEGIN marks a paired loop head, WHILE_TEST branches to its exit on false,
-// and LOOP_BACK returns only to that paired head. Int arithmetic is 64-bit two's complement with wraparound (no overflow trap, R34);
-// division and remainder by zero are run-time errors. The living specification is lmctl-mono
-// lmscript/durable-memory/design/dsl-language.md; the compiler is lmscript's dsl.ts.
+// and LOOP_BACK returns only to that paired head. Int arithmetic is 64-bit two's complement with wraparound (no overflow trap);
+// division and remainder by zero are run-time errors. The language is defined by the lmscript compiler
+// (_dsl_ blocks, npm package @lmctl-ai/lmctl); this header implements the bytecode that compiler emits.
 //
 // Guarantees of load(): wrong magic, other version (including v3), schema-hash mismatch, truncation, trailing bytes, unknown
 // constant tags, undecodable instructions, out-of-range constants/locals/imports/context indices, jumps that do not land on an
 // instruction start or go backwards except for paired structured loops, missing HALT, context declarations
 // and import signatures the registry does not provide are all refused with a message. The language and the VM impose no
-// memory or time limits (operator decision, 2026-10-18): there is no stack cap, no locals cap and no string-size cap.
+// memory or time limits: there is no stack cap, no locals cap and no string-size cap.
 #pragma once
 #include <algorithm>
 #include <cstdint>
@@ -53,6 +53,7 @@
 #include <fstream>
 #include <iostream>
 #include <functional>
+#include <iterator>
 #include <map>
 #include <memory>
 #include <sstream>
@@ -126,6 +127,7 @@ inline std::string hex(const std::string& bytes) {
 struct Value {
   enum Kind { VOID, INT, FLOAT, STR, BOOL, OBJ } kind = VOID;
   int64_t i = 0; double f = 0.0; std::string s; bool b = false; void* obj = nullptr; std::string type;  // type: schema type name of obj
+  std::string context_name;
   static Value none() { return Value(); }
   static Value integer(int64_t v) { Value x; x.kind = INT; x.i = v; return x; }
   static Value real(double v) { Value x; x.kind = FLOAT; x.f = v; return x; }
@@ -138,35 +140,126 @@ using Args = std::vector<Value>;
 using Function = std::function<Value(Args&)>;
 using Method = std::function<Value(void* self, Args&)>;
 
+struct CallSite {
+  std::string file;
+  int line = 0;
+  int column = 0;
+};
+
+struct PlanEntry {
+  int64_t seq = 0;
+  std::string kind = "host_effect";
+  std::string function;
+  Args arguments;
+  std::string arguments_json;
+  int line = 0;
+  int column = 0;
+  std::string file;
+  bool simulated = true;
+  std::string detail_json;
+  bool budget_exceeded = false;
+};
+
+struct VmConfig {
+  uint64_t step_budget = 0;  // 0 = unlimited; max mutating host-effect steps in dry mode
+};
+
 // ---- Host registry: the implementation of the schema, declared with the schema's types ----
 struct Signature { std::vector<std::string> params; std::string returns; };
-struct FunctionEntry { Signature sig; Function fn; };
-struct MethodEntry { Signature sig; Method fn; };
+struct FunctionEntry { Signature sig; Function fn; Function plan_fn; bool mutating = false; };
+struct MethodEntry { Signature sig; Method fn; Method plan_fn; bool mutating = false; };
 inline std::string signature_text(const Signature& s) { std::string out = "("; for (size_t i = 0; i < s.params.size(); ++i) out += (i ? ", " : "") + s.params[i]; return out + ") -> " + s.returns; }
+
+namespace stdlib { struct Collections; struct StdRuntime; }
+enum class StdMode { Enabled, Disabled };
+class Registry;
+inline Registry& register_std(Registry&);
 
 class Registry {
   struct NamedFunction { std::string name; FunctionEntry entry; };
   struct NamedMethod { std::string type, name; MethodEntry entry; };
  public:
+  explicit Registry(StdMode mode = StdMode::Enabled);
+  bool has_std() const { return std_initialized_; }
+  stdlib::Collections& std_collections() const;
+  void set_std_output(std::ostream* sink);
+  std::ostream& std_output() const { return *std_output_; }
+  std::vector<std::string> std_signatures() const { return std_signatures_; }
+  std::vector<std::string> host_signatures() const {
+    auto all = signatures(); std::vector<std::string> out;
+    std::set_difference(all.begin(), all.end(), std_signatures_.begin(), std_signatures_.end(), std::back_inserter(out));
+    return out;
+  }
+  bool matches_schema_signatures(std::vector<std::string> expected) const {
+    expected.insert(expected.end(), std_signatures_.begin(), std_signatures_.end());
+    std::sort(expected.begin(), expected.end()); expected.erase(std::unique(expected.begin(), expected.end()), expected.end());
+    return signatures() == expected;
+  }
+  // One active run per shared std runtime; separate registries own independent runtimes.
+  class StdRunScope {
+   public:
+    explicit StdRunScope(const Registry& r) : registry_(r.has_std() ? &r : nullptr) { if (registry_) registry_->begin_std_run(); }
+    ~StdRunScope() { if (registry_) registry_->end_std_run(); }
+    StdRunScope(const StdRunScope&) = delete;
+    StdRunScope& operator=(const StdRunScope&) = delete;
+   private:
+    const Registry* registry_;
+  };
+  StdRunScope std_run_scope() const { return StdRunScope(*this); }
   // Type names are the schema's: int, float, string, bool, void (returns only) or an object type name. The arity the loader
   // checks is params.size(). Registering a name with the same parameter tuple twice is an error; distinct tuples are overloads.
   Registry& function(const std::string& name, std::vector<std::string> params, std::string returns, Function fn) {
     Signature sig{std::move(params), std::move(returns)};
     for (const auto& f : functions_) if (f.second.name == name && f.second.entry.sig.params == sig.params) throw Error("LOAD_UNBOUND", "registry: function '" + name + signature_text(sig) + "' is registered twice");
     std::string key = "fn " + name + signature_text(sig);
-    functions_.emplace(std::move(key), NamedFunction{name, FunctionEntry{std::move(sig), std::move(fn)}});
+    functions_.emplace(std::move(key), NamedFunction{name, FunctionEntry{std::move(sig), std::move(fn), Function{}, false}});
+    return *this;
+  }
+  Registry& mutating_function(const std::string& name, std::vector<std::string> params, std::string returns, Function plan_fn, Function apply_fn) {
+    Signature sig{std::move(params), std::move(returns)};
+    for (const auto& f : functions_) if (f.second.name == name && f.second.entry.sig.params == sig.params) throw Error("LOAD_UNBOUND", "registry: function '" + name + signature_text(sig) + "' is registered twice");
+    std::string key = "fn " + name + signature_text(sig);
+    functions_.emplace(std::move(key), NamedFunction{name, FunctionEntry{std::move(sig), std::move(apply_fn), std::move(plan_fn), true}});
     return *this;
   }
   Registry& method(const std::string& type, const std::string& name, std::vector<std::string> params, std::string returns, Method fn) {
     Signature sig{std::move(params), std::move(returns)};
     for (const auto& m : methods_) if (m.second.type == type && m.second.name == name && m.second.entry.sig.params == sig.params) throw Error("LOAD_UNBOUND", "registry: method '" + type + "." + name + signature_text(sig) + "' is registered twice");
     std::string key = "method " + type + "." + name + signature_text(sig);
-    methods_.emplace(std::move(key), NamedMethod{type, name, MethodEntry{std::move(sig), std::move(fn)}});
+    methods_.emplace(std::move(key), NamedMethod{type, name, MethodEntry{std::move(sig), std::move(fn), Method{}, false}});
+    return *this;
+  }
+  Registry& mutating_method(const std::string& type, const std::string& name, std::vector<std::string> params, std::string returns, Method plan_fn, Method apply_fn) {
+    Signature sig{std::move(params), std::move(returns)};
+    for (const auto& m : methods_) if (m.second.type == type && m.second.name == name && m.second.entry.sig.params == sig.params) throw Error("LOAD_UNBOUND", "registry: method '" + type + "." + name + signature_text(sig) + "' is registered twice");
+    std::string key = "method " + type + "." + name + signature_text(sig);
+    methods_.emplace(std::move(key), NamedMethod{type, name, MethodEntry{std::move(sig), std::move(apply_fn), std::move(plan_fn), true}});
     return *this;
   }
   Registry& context(const std::string& name, const std::string& type) {
     if (!context_.emplace(name, type).second) throw Error("LOAD_UNBOUND", "registry: context '" + name + "' is declared twice");
     return *this;
+  }
+  std::string context_name_for_type(const std::string& type) const {
+    for (const auto& c : context_) if (c.second == type) return c.first;
+    return "";
+  }
+  void record_plan_detail(std::string detail_json, bool budget_exceeded = false) const {
+    has_pending_plan_detail_ = true;
+    pending_plan_detail_ = std::move(detail_json);
+    pending_budget_exceeded_ = budget_exceeded;
+  }
+  void clear_pending_plan_detail() const {
+    has_pending_plan_detail_ = false;
+    pending_plan_detail_.clear();
+    pending_budget_exceeded_ = false;
+  }
+  bool has_pending_plan_detail() const { return has_pending_plan_detail_; }
+  std::string take_pending_plan_detail(bool& budget_exceeded) const {
+    budget_exceeded = pending_budget_exceeded_;
+    has_pending_plan_detail_ = false;
+    pending_budget_exceeded_ = false;
+    return std::move(pending_plan_detail_);
   }
   // Canonical strings, sorted: exactly what `lmscript --dsl-signatures SCHEMA` prints for the schema this registry implements.
   std::vector<std::string> signatures() const {
@@ -193,6 +286,16 @@ class Registry {
     std::vector<std::string> have; for (auto& m : methods_) if (m.second.type + "." + m.second.name == name) have.push_back(m.first); std::sort(have.begin(), have.end()); std::string out; for (const auto& s : have) out += (out.empty() ? "" : ", ") + s; return out;
   }
  private:
+  friend Registry& register_std(Registry&);
+  void begin_std_run() const;
+  void end_std_run() const noexcept;
+  bool std_initialized_ = false;
+  std::ostream* std_output_ = &std::cout;
+  mutable bool has_pending_plan_detail_ = false;
+  mutable std::string pending_plan_detail_;
+  mutable bool pending_budget_exceeded_ = false;
+  std::vector<std::string> std_signatures_;
+  std::shared_ptr<stdlib::StdRuntime> std_runtime_;
   std::map<std::string, NamedFunction> functions_;
   std::map<std::string, NamedMethod> methods_;
   std::map<std::string, std::string> context_;
@@ -203,7 +306,32 @@ inline std::string json_escape(const std::string& s) {
   for (unsigned char c : s) { switch (c) { case '"': out += "\\\""; break; case '\\': out += "\\\\"; break; case '\n': out += "\\n"; break; case '\r': out += "\\r"; break; case '\t': out += "\\t"; break; default: if (c < 0x20) { char b[8]; std::snprintf(b, sizeof b, "\\u%04x", c); out += b; } else out += char(c); } }
   return out + "\"";
 }
-// ---- The standard result line (spec v4 D7, R26): exactly one JSON line on stdout; the return value is the process exit code. ----
+inline std::string value_to_json(const Value& v) {
+  switch (v.kind) {
+    case Value::VOID: return "null";
+    case Value::INT: return std::to_string(v.i);
+    case Value::FLOAT: {
+      if (!std::isfinite(v.f)) return "null";
+      char buf[64];
+      std::snprintf(buf, sizeof buf, "%.15g", v.f);
+      return buf;
+    }
+    case Value::STR: return json_escape(v.s);
+    case Value::BOOL: return v.b ? "true" : "false";
+    case Value::OBJ: return json_escape(v.type);
+  }
+  return "null";
+}
+inline std::string args_to_json(const Args& args) {
+  std::string out = "[";
+  for (size_t i = 0; i < args.size(); ++i) {
+    if (i) out.push_back(',');
+    out += value_to_json(args[i]);
+  }
+  out.push_back(']');
+  return out;
+}
+// ---- The standard result line: exactly one JSON line on stdout; the return value is the process exit code. ----
 // `result_json` must already be JSON text ("null", "42", json_escape(text), an object...).
 inline int report_ok(const std::string& result_json = "null") { std::cout << "{\"ok\": true, \"result\": " << result_json << "}" << std::endl; return 0; }
 // phase is "load" or "run" (compile failures are lmscript's, exit 2); exit 4 for APP_FAIL, else 3.
@@ -220,8 +348,32 @@ class Context {
  public:
   void set(const std::string& name, void* object) { objects_[name] = object; }
   void* get(const std::string& name) const { auto it = objects_.find(name); return it == objects_.end() ? nullptr : it->second; }
+  void set_dry(bool dry) { dry_ = dry; }
+  bool dry() const { return dry_; }
+  void set_file(std::string file) { file_ = std::move(file); call_site_.file = file_; }
+  const std::string& file() const { return file_; }
+  void set_config(const VmConfig& cfg) { config_ = cfg; }
+  const VmConfig& config() const { return config_; }
+  void set_step_budget(uint64_t budget) { config_.step_budget = budget; }
+  uint64_t step_budget() const { return config_.step_budget; }
+  void set_dry_loop_limit(int64_t limit) { config_.step_budget = limit > 0 ? static_cast<uint64_t>(limit) : 0; }
+  int64_t dry_loop_limit() const { return static_cast<int64_t>(config_.step_budget); }
+  const std::vector<PlanEntry>& plan_entries() const { return plan_entries_; }
+  std::vector<PlanEntry>& plan_entries() { return plan_entries_; }
+  void clear_plan_entries() { plan_entries_.clear(); truncated_ = false; stop_reason_.clear(); }
+  bool truncated() const { return truncated_; }
+  const std::string& stop_reason() const { return stop_reason_; }
+  const CallSite& call_site() const { return call_site_; }
  private:
+  friend class Program;
   std::map<std::string, void*> objects_;
+  bool dry_ = false;
+  std::string file_;
+  VmConfig config_;
+  mutable std::vector<PlanEntry> plan_entries_;
+  mutable bool truncated_ = false;
+  mutable std::string stop_reason_;
+  mutable CallSite call_site_;
 };
 
 // ---- Bytecode ----
@@ -234,9 +386,9 @@ enum Op : uint8_t {
   NEG_I = 0x1B, NEG_F = 0x1C, LT_I = 0x1D, LE_I = 0x1E, GT_I = 0x1F, GE_I = 0x20, LT_F = 0x21, LE_F = 0x22, GT_F = 0x23, GE_F = 0x24, I2F = 0x25,
   // v3: string concatenation and str() conversions
   CONCAT = 0x26, I2S = 0x27, F2S = 0x28, B2S = 0x29,
-  // v4 (spec S4): portable primitive math.  The operand is a one-byte function id.
+  // Portable primitive math. The operand is a one-byte function id.
   MATH = 0x32,
-  // v4 (spec S1'): integer remainder (the dividend's sign; zero divisor is a run-time error).
+  // Integer remainder (the dividend's sign; zero divisor is a run-time error).
   MOD_I = 0x33,
   FOR_RANGE = 0x2f, FOR_NEXT = 0x31,
   // v5: structured while loop markers. LOOP_BACK is the only general backward edge.
@@ -286,6 +438,7 @@ class Program {
   // Parses, binds and verifies. Nothing executes here. Throws dslvm::Error with a message naming the problem.
   static Program load(const std::string& bytecode, const std::string& schemaBytes, const Registry& reg) {
     Program p;
+    p.bound_registry_ = &reg;
     Reader r(bytecode);
     if (bytecode.size() < 4 || std::memcmp(bytecode.data(), MAGIC, 4) != 0) throw Error("LOAD_BAD_BYTECODE", "not a DSL bytecode file: bad magic (expected 'DSLB')");
     r.bytes(4);
@@ -304,8 +457,11 @@ class Program {
     for (uint16_t i = 0; i < nimports; ++i) {
       const std::string& canonical = cidx(r.u32(), "import");
       Import imp;
-      if (canonical.compare(0, 3, "fn ") == 0) imp.fn = reg.function_by_signature(canonical);
-      else if (canonical.compare(0, 7, "method ") == 0) {
+      if (canonical.compare(0, 3, "fn ") == 0) {
+        imp.fn = reg.function_by_signature(canonical);
+        size_t par = canonical.find('(');
+        if (par != std::string::npos && par > 3) imp.name = canonical.substr(3, par - 3);
+      } else if (canonical.compare(0, 7, "method ") == 0) {
         imp.method = reg.method_by_signature(canonical);
         size_t dot = canonical.find('.'), par = canonical.find('(');
         if (dot != std::string::npos && par != std::string::npos && dot < par) { imp.type = canonical.substr(7, dot - 7); imp.name = canonical.substr(dot + 1, par - dot - 1); }
@@ -338,6 +494,8 @@ class Program {
 
   // Executes the chunk once. The host's objects come from ctx (declared names only).
   void run(const Context& ctx, const Registry& reg, RunStats* stats = nullptr) const {
+    if (ctx.dry() && ctx.truncated_) return;
+    auto std_scope = (bound_registry_ ? *bound_registry_ : reg).std_run_scope();
     std::vector<Value> stack, locals(locals_.size());
     stack.reserve(max_stack_);
     Reader r(code_);
@@ -367,6 +525,38 @@ class Program {
       if (x <= -TWO63) return INT64_MIN;
       return static_cast<int64_t>(x);
     };
+    auto update_call_site = [&](size_t pc) {
+      const Line* ln = line_of(pc);
+      ctx.call_site_.file = ctx.file_;
+      ctx.call_site_.line = ln ? static_cast<int>(ln->line) : 0;
+      ctx.call_site_.column = ln ? static_cast<int>(ln->column) : 0;
+    };
+    auto record_plan_entry = [&](const std::string& fn_label, const Args& args, const Value& result) {
+      PlanEntry entry;
+      entry.seq = static_cast<int64_t>(ctx.plan_entries_.size() + 1);
+      entry.kind = "host_effect";
+      entry.function = fn_label;
+      entry.arguments = args;
+      entry.arguments_json = args_to_json(args);
+      entry.line = ctx.call_site_.line;
+      entry.column = ctx.call_site_.column;
+      entry.file = ctx.file_;
+      entry.simulated = true;
+      if (reg.has_pending_plan_detail()) {
+        entry.detail_json = reg.take_pending_plan_detail(entry.budget_exceeded);
+      } else if (result.kind == Value::OBJ) {
+        if (const auto* jm = reg.method_by_signature("method " + result.type + ".json() -> string")) {
+          Args empty;
+          Value jv = jm->fn(result.obj, empty);
+          if (jv.kind == Value::STR) entry.detail_json = std::move(jv.s);
+        }
+        if (entry.detail_json.find("\"budget_exceeded\":true") != std::string::npos ||
+            entry.detail_json.find("\"budget_exceeded\": true") != std::string::npos) {
+          entry.budget_exceeded = true;
+        }
+      }
+      ctx.plan_entries_.push_back(std::move(entry));
+    };
     while (true) {
       const size_t fault_pc = r.pos();
       try {
@@ -387,13 +577,29 @@ class Program {
           const std::string& name = context_[r.u16()];
           void* obj = ctx.get(name);
           if (!obj) throw Error("RUN_ERROR", "context variable '" + name + "' was not provided by the host for this run");
-          push(Value::object(*reg.context_type(name), obj)); break;
+          Value v = Value::object(*reg.context_type(name), obj);
+          v.context_name = name;
+          push(std::move(v)); break;
         }
         case CALL_FN: {
           const Import& imp = imports_[r.u16()]; uint8_t argc = r.u8();
           Args args(argc); for (int i = argc - 1; i >= 0; --i) args[i] = pop();
-          Value result = imp.fn->fn(args);
-          if (result.kind != Value::VOID) push(std::move(result));
+          update_call_site(fault_pc);
+          if (imp.fn->mutating && ctx.dry()) {
+            if (ctx.config_.step_budget > 0 && ctx.plan_entries_.size() >= ctx.config_.step_budget) {
+              ctx.truncated_ = true;
+              ctx.stop_reason_ = "dry loop limit";
+              return;
+            }
+            reg.clear_pending_plan_detail();
+            const Function& target_fn = imp.fn->plan_fn ? imp.fn->plan_fn : imp.fn->fn;
+            Value result = target_fn(args);
+            record_plan_entry(imp.name, args, result);
+            if (result.kind != Value::VOID) push(std::move(result));
+          } else {
+            Value result = imp.fn->fn(args);
+            if (result.kind != Value::VOID) push(std::move(result));
+          }
           break;
         }
         case CALL_METHOD: {
@@ -401,19 +607,34 @@ class Program {
           Args args(argc); for (int i = argc - 1; i >= 0; --i) args[i] = pop();
           Value self = pop();
           if (self.kind != Value::OBJ || self.type != imp.type) throw Error("RUN_ERROR", "method " + imp.type + "." + imp.name + " called on a " + (self.kind == Value::OBJ ? self.type : std::string(self.kind_name())));
-          Value result = imp.method->fn(self.obj, args);
-          if (result.kind != Value::VOID) push(std::move(result));
+          update_call_site(fault_pc);
+          if (imp.method->mutating && ctx.dry()) {
+            if (ctx.config_.step_budget > 0 && ctx.plan_entries_.size() >= ctx.config_.step_budget) {
+              ctx.truncated_ = true;
+              ctx.stop_reason_ = "dry loop limit";
+              return;
+            }
+            reg.clear_pending_plan_detail();
+            const Method& target_fn = imp.method->plan_fn ? imp.method->plan_fn : imp.method->fn;
+            Value result = target_fn(self.obj, args);
+            std::string receiver = !self.context_name.empty() ? self.context_name : reg.context_name_for_type(imp.type);
+            record_plan_entry((receiver.empty() ? imp.type : receiver) + "." + imp.name, args, result);
+            if (result.kind != Value::VOID) push(std::move(result));
+          } else {
+            Value result = imp.method->fn(self.obj, args);
+            if (result.kind != Value::VOID) push(std::move(result));
+          }
           break;
         }
         case EQ: case NE: {
           Value b = pop(), a = pop();
-          if (a.kind != b.kind) throw Error(std::string("cannot compare ") + a.kind_name() + " with " + b.kind_name());
+          if (a.kind != b.kind) throw Error("RUN_ERROR", std::string("cannot compare ") + a.kind_name() + " with " + b.kind_name());
           bool eq = a.kind == Value::INT ? a.i == b.i : a.kind == Value::FLOAT ? a.f == b.f : a.kind == Value::STR ? a.s == b.s : a.kind == Value::BOOL ? a.b == b.b : a.obj == b.obj;
           push(Value::boolean(op == EQ ? eq : !eq)); break;
         }
         case ADD_I: case SUB_I: case MUL_I: case DIV_I: case MOD_I: case LT_I: case LE_I: case GT_I: case GE_I: {
           Value b = pop(), a = pop();
-          if (a.kind != Value::INT || b.kind != Value::INT) throw Error(std::string("int operator applied to ") + a.kind_name() + " and " + b.kind_name());
+          if (a.kind != Value::INT || b.kind != Value::INT) throw Error("RUN_ERROR", std::string("int operator applied to ") + a.kind_name() + " and " + b.kind_name());
           int64_t x = a.i, y = b.i; uint64_t ux = uint64_t(x), uy = uint64_t(y);
           switch (op) {
             case ADD_I: push(Value::integer(wrap(ux + uy))); break;
@@ -428,7 +649,7 @@ class Program {
         }
         case ADD_F: case SUB_F: case MUL_F: case DIV_F: case LT_F: case LE_F: case GT_F: case GE_F: {
           Value b = pop(), a = pop();
-          if (a.kind != Value::FLOAT || b.kind != Value::FLOAT) throw Error(std::string("float operator applied to ") + a.kind_name() + " and " + b.kind_name());
+          if (a.kind != Value::FLOAT || b.kind != Value::FLOAT) throw Error("RUN_ERROR", std::string("float operator applied to ") + a.kind_name() + " and " + b.kind_name());
           switch (op) {
             case ADD_F: push(Value::real(a.f + b.f)); break; case SUB_F: push(Value::real(a.f - b.f)); break;
             case MUL_F: push(Value::real(a.f * b.f)); break; case DIV_F: push(Value::real(a.f / b.f)); break;  // IEEE: inf/nan allowed
@@ -437,20 +658,20 @@ class Program {
           }
           break;
         }
-        case NEG_I: { Value a = pop(); if (a.kind != Value::INT) throw Error(std::string("int negation applied to ") + a.kind_name()); push(Value::integer(wrap(0 - uint64_t(a.i)))); break; }  // INT64_MIN wraps to itself
-        case NEG_F: { Value a = pop(); if (a.kind != Value::FLOAT) throw Error(std::string("float negation applied to ") + a.kind_name()); push(Value::real(-a.f)); break; }
-        case I2F: { Value a = pop(); if (a.kind != Value::INT) throw Error(std::string("float() applied to ") + a.kind_name()); push(Value::real(double(a.i))); break; }
+        case NEG_I: { Value a = pop(); if (a.kind != Value::INT) throw Error("RUN_ERROR", std::string("int negation applied to ") + a.kind_name()); push(Value::integer(wrap(0 - uint64_t(a.i)))); break; }  // INT64_MIN wraps to itself
+        case NEG_F: { Value a = pop(); if (a.kind != Value::FLOAT) throw Error("RUN_ERROR", std::string("float negation applied to ") + a.kind_name()); push(Value::real(-a.f)); break; }
+        case I2F: { Value a = pop(); if (a.kind != Value::INT) throw Error("RUN_ERROR", std::string("float() applied to ") + a.kind_name()); push(Value::real(double(a.i))); break; }
         case CONCAT: {
           Value b = pop(), a = pop();
-          if (a.kind != Value::STR || b.kind != Value::STR) throw Error(std::string("string + applied to ") + a.kind_name() + " and " + b.kind_name());
+          if (a.kind != Value::STR || b.kind != Value::STR) throw Error("RUN_ERROR", std::string("string + applied to ") + a.kind_name() + " and " + b.kind_name());
           push(Value::string(a.s + b.s)); break;
         }
-        case I2S: { Value a = pop(); if (a.kind != Value::INT) throw Error(std::string("str(int) applied to ") + a.kind_name()); push(Value::string(std::to_string(a.i))); break; }
-        case F2S: {  // %.15g: the same text poc-numpy prints; deterministic across hosts
-          Value a = pop(); if (a.kind != Value::FLOAT) throw Error(std::string("str(float) applied to ") + a.kind_name());
+        case I2S: { Value a = pop(); if (a.kind != Value::INT) throw Error("RUN_ERROR", std::string("str(int) applied to ") + a.kind_name()); push(Value::string(std::to_string(a.i))); break; }
+        case F2S: {  // %.15g: deterministic across hosts
+          Value a = pop(); if (a.kind != Value::FLOAT) throw Error("RUN_ERROR", std::string("str(float) applied to ") + a.kind_name());
           char buf[64]; std::snprintf(buf, sizeof buf, "%.15g", a.f); push(Value::string(buf)); break;
         }
-        case B2S: { Value a = pop(); if (a.kind != Value::BOOL) throw Error(std::string("str(bool) applied to ") + a.kind_name()); push(Value::string(a.b ? "true" : "false")); break; }
+        case B2S: { Value a = pop(); if (a.kind != Value::BOOL) throw Error("RUN_ERROR", std::string("str(bool) applied to ") + a.kind_name()); push(Value::string(a.b ? "true" : "false")); break; }
         case MATH: {
           const uint8_t fn = r.u8();
           switch (fn) {
@@ -473,20 +694,20 @@ class Program {
             case MATH_MAX_I: { Value b = pop(), a = pop(); push(Value::integer(a.i > b.i ? a.i : b.i)); break; }
             case MATH_CLAMP_I: { Value hi = pop(), lo = pop(), x = pop(); int64_t lower = x.i < lo.i ? lo.i : x.i; push(Value::integer(lower < hi.i ? lower : hi.i)); break; }
             // The loader structurally rejects unknown IDs before execution.
-            // Bytecode is trusted and R34 adds no run-time validation path.
+            // Bytecode is trusted: there is no run-time validation path.
             default: break;
           }
           break;
         }
         case NOT: {
           Value a = pop();
-          if (a.kind != Value::BOOL) throw Error(std::string("! applied to a ") + a.kind_name());
+          if (a.kind != Value::BOOL) throw Error("RUN_ERROR", std::string("! applied to a ") + a.kind_name());
           push(Value::boolean(!a.b)); break;
         }
         case JUMP: jump(r.i32()); break;
         case JUMP_IF_FALSE: case JUMP_IF_TRUE: {
           int32_t rel = r.i32(); Value c = pop();
-          if (c.kind != Value::BOOL) throw Error(std::string("condition is a ") + c.kind_name() + ", not a bool");
+          if (c.kind != Value::BOOL) throw Error("RUN_ERROR", std::string("condition is a ") + c.kind_name() + ", not a bool");
           if (c.b == (op == JUMP_IF_TRUE)) jump(rel);
           break;
         }
@@ -763,6 +984,7 @@ class Program {
         throw Error("LOAD_BAD_BYTECODE", "WHILE_TEST must leave the loop-head stack depth at offset " + std::to_string(in.pc));
     }
   }
+  const Registry* bound_registry_ = nullptr; // Same lifetime as the bound import entries.
   std::vector<std::string> consts_; std::vector<Import> imports_; std::vector<std::string> context_; std::vector<Local> locals_; uint16_t max_stack_ = 0; std::string code_; std::vector<Line> lines_; std::map<size_t, Loop> loops_;
 };
 
@@ -773,3 +995,12 @@ inline std::string read_file(const std::string& path) {
 }
 
 }  // namespace dslvm
+
+// Support the repository include/ layout and the hosts' pinned cpp/stdlib layout.
+#ifndef DSLVM_STD_DEFER
+#if __has_include("stdlib/std.hpp")
+#include "stdlib/std.hpp"
+#else
+#include "../stdlib/std.hpp"
+#endif
+#endif

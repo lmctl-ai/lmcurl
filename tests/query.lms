@@ -1,0 +1,27 @@
+p = _dsl_ cli="lmcurl" install="github:lmctl-ai/lmcurl@latest";
+# Positive JSONPath, wildcard, predicates, types and filters are exercised by the mock response.
+let s = curl.session("http://127.0.0.1:1");
+let q = curl.query_json("{\"user\":{\"id\":7},\"items\":[\"a\",\"b\"],\"empty\":[]}", "$.user.id");
+assert_eq(q.exists(), true);
+assert_eq(q.is_integer(), true);
+assert_eq(q.to_int(), 7);
+let items = curl.query_json("{\"items\":[\"a\",\"b\"]}", "$.items[*]");
+assert_eq(items.is_collection(), true);
+assert_eq(items.count(), 2);
+assert_eq(items.nth(1).equals("b"), true);
+assert_eq(curl.query_json("{\"ok\":false}", "$.ok").exists(), true);
+assert_eq(curl.query_json("{}", "$.missing").exists(), false);
+assert_eq(q.gt("6"), true);
+assert_eq(q.lt("8"), true);
+assert_eq(q.equals("7"), true);
+assert_eq(items.includes("a"), true);
+assert_eq(items.replace("a", "z").contains("z"), true);
+assert_eq(curl.query_text("a,b").split(",").count(), 2);
+assert_eq(curl.query_text("a%20b").url_decode().equals("a b"), true);
+assert_eq(curl.query_text("<x>").html_escape().equals("&lt;x&gt;"), true);
+assert_eq(curl.schema_valid("{\"x\":1}", "{\"type\":\"object\",\"required\":[\"x\"]}"), true);
+assert_eq(curl.schema_valid("{}", "{\"type\":\"object\",\"required\":[\"x\"]}"), false);
+end _dsl_
+savedsl(p, "build/tests/query.dslb");
+r = system ${dsl_cli(p)} --dsl build/tests/query.dslb;
+assert(r.code == 0);

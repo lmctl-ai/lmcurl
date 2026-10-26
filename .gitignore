@@ -1,3 +1,12 @@
-build/
+/build*/
+/third_party/
+/images/
+/data/
+/reports/
+/cassettes/
+/.omx/
+__pycache__/
+*.dslb
+*.log
 *.lmctl
 .lmctl/

@@ -1,0 +1,28 @@
+p = _dsl_ cli="lmcurl" install="github:lmctl-ai/lmcurl@latest";
+let provider = llm.mock("mock-model");
+let network = curl.mock();
+let local = llm.provider("mock", network.url(), "fixture-model");
+let result = provider.chat("ping").system("You are concise").max_tokens(8).send();
+assert_eq(result.text(), "pong");
+let streamed = local.chat("hello").stream(true).send();
+assert(streamed.status() == 200);
+assert(streamed.output_tokens() > 0);
+assert_eq(result.contains("pong"), true);
+assert_eq(result.matches("^pong$"), true);
+assert_eq(result.json_valid(), false);
+assert(result.output_tokens() > 0);
+assert(result.estimated_cost() >= 0.0);
+let samples = provider.chat("ping").sample(2, 1.0);
+assert_eq(samples.len(), 2);
+assert_eq(samples.at(0).text(), "pong");
+assert(llm_calls() >= 3);
+assert(llm_cost() <= 0.02);
+let matrix = provider.matrix("a,b", "ping");
+assert_eq(matrix.len(), 2);
+let recorded = provider.chat("ping").cassette("build/tests/llm-cassette.json").send();
+let replay = provider.chat("ping").replay("build/tests/llm-cassette.json").send();
+assert_eq(replay.text(), "pong");
+end _dsl_
+savedsl(p, "build/tests/llm.dslb");
+r = system ${dsl_cli(p)} --dsl build/tests/llm.dslb;
+assert(r.code == 0);

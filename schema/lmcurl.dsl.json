@@ -1,0 +1,1464 @@
+{
+  "dsl.schema": 2,
+  "name": "lmcurl",
+  "types": {
+    "Chat": {
+      "methods": {
+        "assistant": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "Chat"
+          }
+        ],
+        "cassette": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "Chat"
+          }
+        ],
+        "json_mode": [
+          {
+            "params": [
+              "bool"
+            ],
+            "returns": "Chat"
+          }
+        ],
+        "max_tokens": [
+          {
+            "params": [
+              "int"
+            ],
+            "returns": "Chat"
+          }
+        ],
+        "replay": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "Chat"
+          }
+        ],
+        "sample": [
+          {
+            "params": [
+              "int",
+              "float"
+            ],
+            "returns": "Sample"
+          }
+        ],
+        "seed": [
+          {
+            "params": [
+              "int"
+            ],
+            "returns": "Chat"
+          }
+        ],
+        "send": [
+          {
+            "params": [],
+            "returns": "Result"
+          }
+        ],
+        "stream": [
+          {
+            "params": [
+              "bool"
+            ],
+            "returns": "Chat"
+          }
+        ],
+        "system": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "Chat"
+          }
+        ],
+        "temperature": [
+          {
+            "params": [
+              "float"
+            ],
+            "returns": "Chat"
+          }
+        ],
+        "tool": [
+          {
+            "params": [
+              "string",
+              "string"
+            ],
+            "returns": "Chat"
+          }
+        ],
+        "user": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "Chat"
+          }
+        ]
+      }
+    },
+    "Curl": {
+      "methods": {
+        "env": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "string"
+          }
+        ],
+        "load": [
+          {
+            "params": [
+              "Request",
+              "int",
+              "float",
+              "int"
+            ],
+            "returns": "LoadResult"
+          }
+        ],
+        "mock": [
+          {
+            "params": [],
+            "returns": "Mock"
+          }
+        ],
+        "query_json": [
+          {
+            "params": [
+              "string",
+              "string"
+            ],
+            "returns": "Query"
+          }
+        ],
+        "query_text": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "Query"
+          }
+        ],
+        "schema_valid": [
+          {
+            "params": [
+              "string",
+              "string"
+            ],
+            "returns": "bool"
+          }
+        ],
+        "session": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "Session"
+          }
+        ],
+        "suite": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "Suite"
+          }
+        ],
+        "version": [
+          {
+            "params": [],
+            "returns": "string"
+          }
+        ]
+      }
+    },
+    "Llm": {
+      "methods": {
+        "deepseek": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "Provider"
+          }
+        ],
+        "ledger": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "void"
+          }
+        ],
+        "mock": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "Provider"
+          }
+        ],
+        "ollama": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "Provider"
+          }
+        ],
+        "openrouter": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "Provider"
+          }
+        ],
+        "provider": [
+          {
+            "params": [
+              "string",
+              "string",
+              "string"
+            ],
+            "returns": "Provider"
+          }
+        ]
+      }
+    },
+    "LoadResult": {
+      "methods": {
+        "error_rate": [
+          {
+            "params": [],
+            "returns": "float"
+          }
+        ],
+        "p50_ms": [
+          {
+            "params": [],
+            "returns": "float"
+          }
+        ],
+        "p95_ms": [
+          {
+            "params": [],
+            "returns": "float"
+          }
+        ],
+        "p99_ms": [
+          {
+            "params": [],
+            "returns": "float"
+          }
+        ],
+        "requests": [
+          {
+            "params": [],
+            "returns": "int"
+          }
+        ],
+        "threshold": [
+          {
+            "params": [
+              "float",
+              "float"
+            ],
+            "returns": "bool"
+          }
+        ]
+      }
+    },
+    "Matrix": {
+      "methods": {
+        "at": [
+          {
+            "params": [
+              "int"
+            ],
+            "returns": "Result"
+          }
+        ],
+        "csv": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "void"
+          }
+        ],
+        "len": [
+          {
+            "params": [],
+            "returns": "int"
+          }
+        ],
+        "pass_rate": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "float"
+          }
+        ]
+      }
+    },
+    "Mock": {
+      "methods": {
+        "stop": [
+          {
+            "params": [],
+            "returns": "void"
+          }
+        ],
+        "url": [
+          {
+            "params": [],
+            "returns": "string"
+          }
+        ]
+      }
+    },
+    "Provider": {
+      "methods": {
+        "chat": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "Chat"
+          }
+        ],
+        "matrix": [
+          {
+            "params": [
+              "string",
+              "string"
+            ],
+            "returns": "Matrix"
+          }
+        ],
+        "model": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "Provider"
+          }
+        ]
+      }
+    },
+    "Query": {
+      "methods": {
+        "contains": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "bool"
+          }
+        ],
+        "count": [
+          {
+            "params": [],
+            "returns": "int"
+          }
+        ],
+        "ends_with": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "bool"
+          }
+        ],
+        "equals": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "bool"
+          }
+        ],
+        "exists": [
+          {
+            "params": [],
+            "returns": "bool"
+          }
+        ],
+        "format": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "Query"
+          }
+        ],
+        "gt": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "bool"
+          }
+        ],
+        "html_escape": [
+          {
+            "params": [],
+            "returns": "Query"
+          }
+        ],
+        "includes": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "bool"
+          }
+        ],
+        "is_collection": [
+          {
+            "params": [],
+            "returns": "bool"
+          }
+        ],
+        "is_empty": [
+          {
+            "params": [],
+            "returns": "bool"
+          }
+        ],
+        "is_integer": [
+          {
+            "params": [],
+            "returns": "bool"
+          }
+        ],
+        "is_string": [
+          {
+            "params": [],
+            "returns": "bool"
+          }
+        ],
+        "lt": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "bool"
+          }
+        ],
+        "matches": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "bool"
+          }
+        ],
+        "missing": [
+          {
+            "params": [],
+            "returns": "bool"
+          }
+        ],
+        "not_equals": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "bool"
+          }
+        ],
+        "nth": [
+          {
+            "params": [
+              "int"
+            ],
+            "returns": "Query"
+          }
+        ],
+        "regex": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "Query"
+          }
+        ],
+        "replace": [
+          {
+            "params": [
+              "string",
+              "string"
+            ],
+            "returns": "Query"
+          }
+        ],
+        "split": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "Query"
+          }
+        ],
+        "starts_with": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "bool"
+          }
+        ],
+        "to_date": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "Query"
+          }
+        ],
+        "to_int": [
+          {
+            "params": [],
+            "returns": "int"
+          }
+        ],
+        "url_decode": [
+          {
+            "params": [],
+            "returns": "Query"
+          }
+        ],
+        "value": [
+          {
+            "params": [],
+            "returns": "string"
+          }
+        ]
+      }
+    },
+    "Report": {
+      "methods": {
+        "assert_all": [
+          {
+            "params": [],
+            "returns": "bool"
+          }
+        ],
+        "console": [
+          {
+            "params": [],
+            "returns": "string"
+          }
+        ],
+        "csv": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "void"
+          }
+        ],
+        "failed": [
+          {
+            "params": [],
+            "returns": "int"
+          }
+        ],
+        "html": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "void"
+          }
+        ],
+        "json": [
+          {
+            "params": [],
+            "returns": "string"
+          }
+        ],
+        "junit": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "void"
+          }
+        ],
+        "passed": [
+          {
+            "params": [],
+            "returns": "int"
+          }
+        ],
+        "save": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "void"
+          }
+        ],
+        "skipped": [
+          {
+            "params": [],
+            "returns": "int"
+          }
+        ],
+        "tap": [
+          {
+            "params": [],
+            "returns": "string"
+          }
+        ]
+      }
+    },
+    "Request": {
+      "methods": {
+        "basic": [
+          {
+            "params": [
+              "string",
+              "string"
+            ],
+            "returns": "Request"
+          }
+        ],
+        "bearer_env": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "Request"
+          }
+        ],
+        "body": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "Request"
+          }
+        ],
+        "cacert": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "Request"
+          }
+        ],
+        "cert": [
+          {
+            "params": [
+              "string",
+              "string"
+            ],
+            "returns": "Request"
+          }
+        ],
+        "digest": [
+          {
+            "params": [
+              "string",
+              "string"
+            ],
+            "returns": "Request"
+          }
+        ],
+        "follow": [
+          {
+            "params": [
+              "bool"
+            ],
+            "returns": "Request"
+          }
+        ],
+        "form": [
+          {
+            "params": [
+              "string",
+              "string"
+            ],
+            "returns": "Request"
+          }
+        ],
+        "header": [
+          {
+            "params": [
+              "string",
+              "string"
+            ],
+            "returns": "Request"
+          }
+        ],
+        "http2": [
+          {
+            "params": [
+              "bool"
+            ],
+            "returns": "Request"
+          }
+        ],
+        "insecure": [
+          {
+            "params": [
+              "bool"
+            ],
+            "returns": "Request"
+          }
+        ],
+        "json": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "Request"
+          }
+        ],
+        "limit": [
+          {
+            "params": [
+              "int"
+            ],
+            "returns": "Request"
+          }
+        ],
+        "part": [
+          {
+            "params": [
+              "string",
+              "string"
+            ],
+            "returns": "Request"
+          }
+        ],
+        "proxy": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "Request"
+          }
+        ],
+        "resolve": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "Request"
+          }
+        ],
+        "retry": [
+          {
+            "params": [
+              "int",
+              "int"
+            ],
+            "returns": "Request"
+          }
+        ],
+        "send": [
+          {
+            "params": [],
+            "returns": "Response"
+          }
+        ],
+        "stream": [
+          {
+            "params": [
+              "bool"
+            ],
+            "returns": "Request"
+          }
+        ],
+        "timeout": [
+          {
+            "params": [
+              "int"
+            ],
+            "returns": "Request"
+          }
+        ],
+        "upload": [
+          {
+            "params": [
+              "string",
+              "string",
+              "string"
+            ],
+            "returns": "Request"
+          }
+        ]
+      }
+    },
+    "Response": {
+      "methods": {
+        "assert_json_schema": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "bool"
+          }
+        ],
+        "assert_openapi": [
+          {
+            "params": [
+              "string",
+              "string",
+              "string"
+            ],
+            "returns": "bool"
+          }
+        ],
+        "attempts": [
+          {
+            "params": [],
+            "returns": "int"
+          }
+        ],
+        "body": [
+          {
+            "params": [],
+            "returns": "string"
+          }
+        ],
+        "bytes": [
+          {
+            "params": [],
+            "returns": "int"
+          }
+        ],
+        "certificate": [
+          {
+            "params": [],
+            "returns": "string"
+          }
+        ],
+        "cookie": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "string"
+          }
+        ],
+        "error": [
+          {
+            "params": [],
+            "returns": "string"
+          }
+        ],
+        "header": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "string"
+          }
+        ],
+        "json": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "Query"
+          }
+        ],
+        "query": [
+          {
+            "params": [
+              "string",
+              "string"
+            ],
+            "returns": "Query"
+          }
+        ],
+        "save": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "void"
+          }
+        ],
+        "snapshot": [
+          {
+            "params": [
+              "string",
+              "bool"
+            ],
+            "returns": "bool"
+          }
+        ],
+        "sse_count": [
+          {
+            "params": [],
+            "returns": "int"
+          }
+        ],
+        "status": [
+          {
+            "params": [],
+            "returns": "int"
+          }
+        ],
+        "time": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "float"
+          }
+        ],
+        "url": [
+          {
+            "params": [],
+            "returns": "string"
+          }
+        ],
+        "xpath": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "Query"
+          }
+        ]
+      }
+    },
+    "Result": {
+      "methods": {
+        "contains": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "bool"
+          }
+        ],
+        "equals": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "bool"
+          }
+        ],
+        "estimated_cost": [
+          {
+            "params": [],
+            "returns": "float"
+          }
+        ],
+        "finish": [
+          {
+            "params": [],
+            "returns": "string"
+          }
+        ],
+        "input_tokens": [
+          {
+            "params": [],
+            "returns": "int"
+          }
+        ],
+        "json": [
+          {
+            "params": [],
+            "returns": "string"
+          }
+        ],
+        "json_valid": [
+          {
+            "params": [],
+            "returns": "bool"
+          }
+        ],
+        "latency_ms": [
+          {
+            "params": [],
+            "returns": "float"
+          }
+        ],
+        "length": [
+          {
+            "params": [],
+            "returns": "int"
+          }
+        ],
+        "matches": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "bool"
+          }
+        ],
+        "model": [
+          {
+            "params": [],
+            "returns": "string"
+          }
+        ],
+        "not_contains": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "bool"
+          }
+        ],
+        "output_tokens": [
+          {
+            "params": [],
+            "returns": "int"
+          }
+        ],
+        "schema_valid": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "bool"
+          }
+        ],
+        "status": [
+          {
+            "params": [],
+            "returns": "int"
+          }
+        ],
+        "text": [
+          {
+            "params": [],
+            "returns": "string"
+          }
+        ],
+        "tools": [
+          {
+            "params": [],
+            "returns": "string"
+          }
+        ]
+      }
+    },
+    "Sample": {
+      "methods": {
+        "at": [
+          {
+            "params": [
+              "int"
+            ],
+            "returns": "Result"
+          }
+        ],
+        "csv": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "void"
+          }
+        ],
+        "len": [
+          {
+            "params": [],
+            "returns": "int"
+          }
+        ],
+        "pass_rate": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "float"
+          }
+        ]
+      }
+    },
+    "Session": {
+      "methods": {
+        "delete": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "Request"
+          }
+        ],
+        "get": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "Request"
+          }
+        ],
+        "get_var": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "string"
+          }
+        ],
+        "head": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "Request"
+          }
+        ],
+        "header": [
+          {
+            "params": [
+              "string",
+              "string"
+            ],
+            "returns": "Session"
+          }
+        ],
+        "patch": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "Request"
+          }
+        ],
+        "post": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "Request"
+          }
+        ],
+        "put": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "Request"
+          }
+        ],
+        "request": [
+          {
+            "params": [
+              "string",
+              "string"
+            ],
+            "returns": "Request"
+          }
+        ],
+        "secret": [
+          {
+            "params": [
+              "string",
+              "string"
+            ],
+            "returns": "Session"
+          }
+        ],
+        "set": [
+          {
+            "params": [
+              "string",
+              "string"
+            ],
+            "returns": "Session"
+          }
+        ]
+      }
+    },
+    "Suite": {
+      "methods": {
+        "after": [
+          {
+            "params": [
+              "Request"
+            ],
+            "returns": "Suite"
+          }
+        ],
+        "before": [
+          {
+            "params": [
+              "Request"
+            ],
+            "returns": "Suite"
+          }
+        ],
+        "data_csv": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "Suite"
+          }
+        ],
+        "data_json": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "Suite"
+          }
+        ],
+        "fail_fast": [
+          {
+            "params": [
+              "bool"
+            ],
+            "returns": "Suite"
+          }
+        ],
+        "filter": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "Suite"
+          }
+        ],
+        "parallel": [
+          {
+            "params": [
+              "bool"
+            ],
+            "returns": "Suite"
+          }
+        ],
+        "report": [
+          {
+            "params": [],
+            "returns": "Report"
+          }
+        ],
+        "test_request": [
+          {
+            "params": [
+              "string",
+              "Request"
+            ],
+            "returns": "Test"
+          }
+        ]
+      }
+    },
+    "Test": {
+      "methods": {
+        "capture": [
+          {
+            "params": [
+              "string",
+              "string"
+            ],
+            "returns": "Test"
+          }
+        ],
+        "capture_secret": [
+          {
+            "params": [
+              "string",
+              "string"
+            ],
+            "returns": "Test"
+          }
+        ],
+        "expect_body": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "Test"
+          }
+        ],
+        "expect_exact": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "Test"
+          }
+        ],
+        "expect_json": [
+          {
+            "params": [
+              "string",
+              "string"
+            ],
+            "returns": "Test"
+          }
+        ],
+        "expect_schema": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "Test"
+          }
+        ],
+        "expect_status": [
+          {
+            "params": [
+              "int"
+            ],
+            "returns": "Test"
+          }
+        ],
+        "expect_status_in": [
+          {
+            "params": [
+              "int",
+              "int"
+            ],
+            "returns": "Test"
+          }
+        ],
+        "expect_xpath": [
+          {
+            "params": [
+              "string",
+              "string"
+            ],
+            "returns": "Test"
+          }
+        ],
+        "poll_json": [
+          {
+            "params": [
+              "string",
+              "string",
+              "int",
+              "int"
+            ],
+            "returns": "Test"
+          }
+        ],
+        "retry": [
+          {
+            "params": [
+              "int",
+              "int"
+            ],
+            "returns": "Test"
+          }
+        ],
+        "tag": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "Test"
+          }
+        ],
+        "timeout": [
+          {
+            "params": [
+              "int"
+            ],
+            "returns": "Test"
+          }
+        ]
+      }
+    }
+  },
+  "functions": {
+    "assert": [
+      {
+        "params": [
+          "bool"
+        ],
+        "returns": "void"
+      }
+    ],
+    "assert_close": [
+      {
+        "params": [
+          "float",
+          "float",
+          "float"
+        ],
+        "returns": "void"
+      }
+    ],
+    "assert_eq": [
+      {
+        "params": [
+          "bool",
+          "bool"
+        ],
+        "returns": "void"
+      },
+      {
+        "params": [
+          "int",
+          "int"
+        ],
+        "returns": "void"
+      },
+      {
+        "params": [
+          "string",
+          "string"
+        ],
+        "returns": "void"
+      }
+    ],
+    "llm_calls": [
+      {
+        "params": [],
+        "returns": "int"
+      }
+    ],
+    "llm_cost": [
+      {
+        "params": [],
+        "returns": "float"
+      }
+    ],
+    "print": [
+      {
+        "params": [
+          "string"
+        ],
+        "returns": "void"
+      }
+    ],
+    "println": [
+      {
+        "params": [
+          "string"
+        ],
+        "returns": "void"
+      }
+    ]
+  },
+  "context": {
+    "curl": "Curl",
+    "llm": "Llm"
+  }
+}
