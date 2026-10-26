@@ -1,0 +1,66 @@
+{
+  "dsl.schema": 2,
+  "name": "curl",
+  "types": {
+    "Request": {
+      "methods": {
+        "method": [{"params":["string"],"returns":"Request"}],
+        "url": [{"params":["string"],"returns":"Request"}],
+        "header": [{"params":["string","string"],"returns":"Request"}],
+        "body": [{"params":["string"],"returns":"Request"}],
+        "timeout_ms": [{"params":["int"],"returns":"Request"}],
+        "max_bytes": [{"params":["int"],"returns":"Request"}],
+        "max_redirects": [{"params":["int"],"returns":"Request"}],
+        "send": [{"params":[],"returns":"Response"}]
+      }
+    },
+    "Response": {
+      "methods": {
+        "status": [{"params":[],"returns":"int"}],
+        "ok": [{"params":[],"returns":"bool"}],
+        "body": [{"params":[],"returns":"string"}],
+        "header": [{"params":["string"],"returns":"string"}],
+        "has_json": [{"params":["string"],"returns":"bool"}],
+        "json_text": [{"params":["string"],"returns":"string"}]
+      }
+    },
+    "Mirror": {
+      "methods": {
+        "start": [{"params":["string"],"returns":"Mirror"}],
+        "depth": [{"params":["int"],"returns":"Mirror"}],
+        "same_host": [{"params":["bool"],"returns":"Mirror"}],
+        "allow": [{"params":["string"],"returns":"Mirror"}],
+        "out_dir": [{"params":["string"],"returns":"Mirror"}],
+        "max_pages": [{"params":["int"],"returns":"Mirror"}],
+        "max_bytes": [{"params":["int"],"returns":"Mirror"}],
+        "delay_ms": [{"params":["int"],"returns":"Mirror"}],
+        "run": [{"params":[],"returns":"MirrorResult"}]
+      }
+    },
+    "MirrorResult": {
+      "methods": {
+        "pages": [{"params":[],"returns":"int"}],
+        "skipped": [{"params":[],"returns":"int"}],
+        "failed": [{"params":[],"returns":"int"}],
+        "bytes": [{"params":[],"returns":"int"}]
+      }
+    },
+    "Output": {
+      "methods": {
+        "print": [{"params":["string"],"returns":"void"}],
+        "write_file": [{"params":["string","string"],"returns":"void"}],
+        "fail": [{"params":["string"],"returns":"void"}]
+      }
+    }
+  },
+  "functions": {
+    "request": [{"params":[],"returns":"Request"}],
+    "mirror": [{"params":[],"returns":"Mirror"}],
+    "env": [{"params":["string"],"returns":"string"}],
+    "has_env": [{"params":["string"],"returns":"bool"}],
+    "json_escape": [{"params":["string"],"returns":"string"}]
+  },
+  "context": {
+    "out": "Output"
+  }
+}
