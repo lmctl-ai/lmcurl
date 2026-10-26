@@ -1,0 +1,51 @@
+{
+  "version": "0.1.1",
+  "tag_commit": "cf557ea428de8142a0d49ab3f996a4f3580bfa65",
+  "release_url": "https://github.com/lmctl-ai/lmcurl/releases/tag/v0.1.1",
+  "packaging_run": "https://github.com/lmctl-ai/lmcurl/actions/runs/40318126594",
+  "all_five_platform_jobs_passed": true,
+  "downloaded_asset_hashes_verified": true,
+  "parser_dependency": "lmhtml >=0.7.4",
+  "parser_fix_commit": "00fa77abc069716a0c52d3c7357e1385305068d1",
+  "linux_native_platforms": [
+    "linux-x64",
+    "linux-arm64"
+  ],
+  "metadata_stub_platforms": [
+    "macos-arm64",
+    "macos-x64",
+    "windows-x64"
+  ],
+  "assets": [
+    {
+      "name": "SHA256SUMS",
+      "bytes": 425,
+      "sha256": "3d559b35d2665d1e15dfeaeeeedcfeb69253b05fe6ddd387f774e07b4d11a099"
+    },
+    {
+      "name": "lmcurl-linux-arm64",
+      "bytes": 13052280,
+      "sha256": "f9c440ded55949b648f4182302dd10f66ffc94cab013232bab42a745948ef545"
+    },
+    {
+      "name": "lmcurl-linux-x64",
+      "bytes": 13644024,
+      "sha256": "755c024907a85bb6159b0017e34bc96ef03a4855e2c26952df692e7ac5543e28"
+    },
+    {
+      "name": "lmcurl-macos-arm64",
+      "bytes": 86120,
+      "sha256": "9476fb25d592269f2f66d8775a533b3526b53fa477acadcbef58d91b412322c5"
+    },
+    {
+      "name": "lmcurl-macos-x64",
+      "bytes": 73040,
+      "sha256": "aa0433f4be20a474113e12695ac01e97c50b9e942fd9b07527ff3f858eda3c2f"
+    },
+    {
+      "name": "lmcurl-windows-x64.exe",
+      "bytes": 2627520,
+      "sha256": "17c37d53d444347f92f86b5bf0176d7ec742ad7887ffba3a7954f32525dfbc18"
+    }
+  ]
+}

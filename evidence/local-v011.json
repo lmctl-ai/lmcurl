@@ -31,6 +31,7 @@
   "known_credential_values_found": false,
   "desktop_native_transport_supported": false,
   "parser_version": "lmhtml 0.7.4",
-  "parser_source": "local compatibility patch candidate; published assets verified separately",
-  "old_parser_guard_checked": true
+  "parser_source": "published v0.7.4 Linux x64 asset",
+  "old_parser_guard_checked": true,
+  "parser_sha256": "74665de185b48d41887be476244f9a539491abaee12c8b3f4a5fd2746a09d932"
 }

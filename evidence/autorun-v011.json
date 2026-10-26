@@ -1,0 +1,213 @@
+{
+  "installed_versions": {
+    "lmcurl": "lmcurl 0.1.1",
+    "lmhtml": "lmhtml 0.7.4",
+    "lmplot": "lmplot 0.2.1",
+    "lmdraw": "lmdraw 0.2.6"
+  },
+  "version": "lmcurl 0.1.1",
+  "scope": "new_downloader_parser",
+  "fresh_tool_cache": true,
+  "hosts_removed_from_path": [
+    "lmcurl",
+    "lmhtml",
+    "lmplot",
+    "lmdraw"
+  ],
+  "empty_working_directory_per_example": true,
+  "installed_binary_sha256": "755c024907a85bb6159b0017e34bc96ef03a4855e2c26952df692e7ac5543e28",
+  "examples": [
+    {
+      "cost": {
+        "estimated_cost_usd": 0,
+        "requests": 5
+      },
+      "example": "web_link_checker",
+      "url": "https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_link_checker.lms",
+      "passed": true,
+      "elapsed_seconds": 8.322,
+      "image_bytes": 30197,
+      "image_sha256": "44a134e21955178757e576357d5ab9c051c7a4e5df730f9fe1d732a0f506d8cf"
+    },
+    {
+      "cost": {
+        "estimated_cost_usd": 0,
+        "requests": 4
+      },
+      "example": "web_sitemap_crawler",
+      "url": "https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_sitemap_crawler.lms",
+      "passed": true,
+      "elapsed_seconds": 1.184,
+      "image_bytes": 30220,
+      "image_sha256": "e54ae5a878b38cd0ee85ec21f0eb69ad2348bf9b480e9f91073a3025beb2c961"
+    },
+    {
+      "cost": {
+        "estimated_cost_usd": 0,
+        "requests": 2
+      },
+      "example": "web_feed_reader",
+      "url": "https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_feed_reader.lms",
+      "passed": true,
+      "elapsed_seconds": 1.071,
+      "image_bytes": 28901,
+      "image_sha256": "8ddc57ca37fe26f085567e77c9f1bf7910d2de27c07242c84dcfe1575432f899"
+    },
+    {
+      "cost": {
+        "estimated_cost_usd": 0,
+        "requests": 1
+      },
+      "example": "web_table_scraper",
+      "url": "https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_table_scraper.lms",
+      "passed": true,
+      "elapsed_seconds": 1.031,
+      "image_bytes": 31062,
+      "image_sha256": "a67503552c44b88a9286b6f121529f96fd6ee8b096fcef9f12be048d33d1d6b9"
+    },
+    {
+      "cost": {
+        "estimated_cost_usd": 0,
+        "requests": 3
+      },
+      "example": "web_price_watcher",
+      "url": "https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_price_watcher.lms",
+      "passed": true,
+      "elapsed_seconds": 1.205,
+      "image_bytes": 39341,
+      "image_sha256": "1e2d51e35ab012be241913977128b7f70e8bc0a2ccf6402e89f23f877649362c"
+    },
+    {
+      "cost": {
+        "estimated_cost_usd": 0,
+        "requests": 3
+      },
+      "example": "web_login_form",
+      "url": "https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_login_form.lms",
+      "passed": true,
+      "elapsed_seconds": 1.199,
+      "image_bytes": 32239,
+      "image_sha256": "dcda4cbde148205c28606b731c360492da1a6a507fa897f2eea16eb51012bc06"
+    },
+    {
+      "cost": {
+        "estimated_cost_usd": 0,
+        "requests": 3
+      },
+      "example": "web_pagination",
+      "url": "https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_pagination.lms",
+      "passed": true,
+      "elapsed_seconds": 1.128,
+      "image_bytes": 26558,
+      "image_sha256": "68c018a2ab9dfe7639e62c7a4496761f176a06ef3d1d4f462abe5861911cd5cd"
+    },
+    {
+      "cost": {
+        "estimated_cost_usd": 0,
+        "requests": 5
+      },
+      "example": "web_site_mirror",
+      "url": "https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_site_mirror.lms",
+      "passed": true,
+      "elapsed_seconds": 3.482,
+      "image_bytes": 87939,
+      "image_sha256": "042193249c1c4638868c84103e4d8742eecfbd6b30ae3d076d6a357ec7591a47"
+    },
+    {
+      "cost": {
+        "estimated_cost_usd": 0,
+        "requests": 1
+      },
+      "example": "web_seo_audit",
+      "url": "https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_seo_audit.lms",
+      "passed": true,
+      "elapsed_seconds": 1.042,
+      "image_bytes": 32520,
+      "image_sha256": "c28039dd2f1fc3d533192131fbbe9e0babf35e8dffb755e247cbfe936fd93053"
+    },
+    {
+      "cost": {
+        "estimated_cost_usd": 0,
+        "requests": 6
+      },
+      "example": "web_image_redirect_audit",
+      "url": "https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_image_redirect_audit.lms",
+      "passed": true,
+      "elapsed_seconds": 1.181,
+      "image_bytes": 29821,
+      "image_sha256": "71e93338af258a9fb4bec5571aa5c6b6104f30a57d274e8c0278715faad5c3d3"
+    },
+    {
+      "cost": {
+        "estimated_cost_usd": 0,
+        "requests": 2
+      },
+      "example": "web_api_html_consistency",
+      "url": "https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_api_html_consistency.lms",
+      "passed": true,
+      "elapsed_seconds": 1.054,
+      "image_bytes": 31840,
+      "image_sha256": "793da37056a3af9e85230c1551305dd96ce658290225a90fdc0a620254db423e"
+    },
+    {
+      "cost": {
+        "estimated_cost_usd": 0,
+        "requests": 3
+      },
+      "example": "web_content_diff",
+      "url": "https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_content_diff.lms",
+      "passed": true,
+      "elapsed_seconds": 1.081,
+      "image_bytes": 64569,
+      "image_sha256": "081f0ce5fbb1de2507f7f77ae36eac1687cb7439a8642ebe820c5cf2bc342649"
+    },
+    {
+      "cost": {
+        "estimated_cost_usd": 0,
+        "requests": 1
+      },
+      "example": "web_accessibility_scan",
+      "url": "https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_accessibility_scan.lms",
+      "passed": true,
+      "elapsed_seconds": 1.056,
+      "image_bytes": 32036,
+      "image_sha256": "bbfa1f1213ce600fbe66dd92f4b39062cdbf85a0173dda2cc6c1e0a445802080"
+    },
+    {
+      "cost": {
+        "estimated_cost_usd": 0,
+        "requests": 1
+      },
+      "example": "web_metadata_extractor",
+      "url": "https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_metadata_extractor.lms",
+      "passed": true,
+      "elapsed_seconds": 1.035,
+      "image_bytes": 29589,
+      "image_sha256": "130c24515e60e772748bb07df34a4f284d846e1c8063fe1d880df229dc6cb917"
+    },
+    {
+      "cost": {
+        "estimated_cost_usd": 0,
+        "requests": 1
+      },
+      "example": "web_form_inventory",
+      "url": "https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_form_inventory.lms",
+      "passed": true,
+      "elapsed_seconds": 1.052,
+      "image_bytes": 31118,
+      "image_sha256": "4ca20b82fbb68e0afe0f694d57321efb700925f4fcfe64f4958e918de1d7fb82"
+    },
+    {
+      "cost": {
+        "estimated_cost_usd": 0,
+        "requests": 5
+      },
+      "example": "web_robots_crawler",
+      "url": "https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_robots_crawler.lms",
+      "passed": true,
+      "elapsed_seconds": 1.243,
+      "image_bytes": 34315,
+      "image_sha256": "fa54ab62e105549047656ae269ac142863999134ea27e07a96c7eda14077c092"
+    }
+  ]
+}
