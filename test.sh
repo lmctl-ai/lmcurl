@@ -7,7 +7,7 @@ case "$(uname -s)" in Darwin|MINGW*|MSYS*|CYGWIN*)
  cmake -S . -B "$BUILD_DIR" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER="${CC:-gcc}" -DCMAKE_CXX_COMPILER="${CXX:-g++}" >/dev/null
  cmake --build "$BUILD_DIR" --parallel 2 >/dev/null
  exe="$BUILD_DIR/lmcurl"; [[ -f "$exe.exe" ]] && exe="$exe.exe"
- [[ "$("$exe" --version)" == 'lmcurl 0.1.1' ]]
+ [[ "$("$exe" --version)" == 'lmcurl 0.1.2' ]]
  "$exe" --help | grep -q 'stub'
  "$exe" --dsl-schema --json | python3 -c 'import json,sys;assert json.load(sys.stdin)["name"]=="lmcurl"'
  set +e; "$exe" --dsl not-present.dslb 2>"$BUILD_DIR/stub.err"; status=$?; set -e
@@ -28,7 +28,7 @@ fi
 exe="$(cd "$BUILD_DIR" && pwd)/lmcurl"
 export PATH="$(dirname "$exe"):$PATH"
 compiler="$(scripts/select-compiler.sh)"
-[[ "$("$exe" --version)" == 'lmcurl 0.1.1' ]]
+[[ "$("$exe" --version)" == 'lmcurl 0.1.2' ]]
 "$exe" --notices >"$BUILD_DIR/notices.check"; cmp THIRD_PARTY_NOTICES "$BUILD_DIR/notices.check"
 python3 scripts/gen-schema.py "$exe" >"$BUILD_DIR/schema.check"; cmp schema/lmcurl.dsl.json "$BUILD_DIR/schema.check"
 "$exe" --dsl-schema --json >"$BUILD_DIR/embedded.check"; cmp schema/lmcurl.dsl.json "$BUILD_DIR/embedded.check"
