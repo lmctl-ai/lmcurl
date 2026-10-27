@@ -1,6 +1,6 @@
 # Build and verification
 
-`BUILD_DIR=build LMCURL_TEST_NETWORK=1 bash test.sh` is the local release gate. It verifies SDK/dependency pins, builds, checks version/schema/signatures/notices and dynamic-glibc linkage, runs five DSL programs (including tool-stream and lmhtml integration), 29 native cases, the concurrent memory regression and the Mock.serve subprocess lifecycle test. The default 4096 MiB limit is also exercised under a 6 GiB virtual-memory ceiling.
+`BUILD_DIR=build LMCURL_TEST_NETWORK=1 bash test.sh` is the local release gate. It verifies SDK/dependency pins, builds, checks version/schema/signatures/notices and dynamic-glibc linkage, runs five DSL programs (including tool-stream and lmhtml integration), 32 native cases, the concurrent memory regression and the Mock.serve subprocess lifecycle test. The default 4096 MiB limit is also exercised under a 6 GiB virtual-memory ceiling.
 
 The full rendering gate executes all 48 examples from separate empty directories, checks 900x560 PNGs at most 300 KiB, and validates the 16 new zero-cost request ledgers. Without renderers/network opt-in, image execution skips loudly and committed image bytes are checked. No live provider credentials are needed.
 

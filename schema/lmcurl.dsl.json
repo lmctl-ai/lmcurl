@@ -652,6 +652,14 @@
     },
     "Request": {
       "methods": {
+        "allow_error": [
+          {
+            "params": [
+              "bool"
+            ],
+            "returns": "Request"
+          }
+        ],
         "basic": [
           {
             "params": [

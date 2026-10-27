@@ -254,8 +254,14 @@ Response Session::perform(const Request &input) const {
     auto remaining =
         std::chrono::duration_cast<std::chrono::milliseconds>(request.deadline - Clock::now())
             .count();
-    if (remaining < 1)
+    if (remaining < 1) {
+      if (request.allow_error) {
+        t.result.error = "HTTP request deadline exceeded";
+        result = std::move(t.result);
+        break;
+      }
       throw dslvm::Error("HTTP request deadline exceeded");
+    }
     set(CURLOPT_TIMEOUT_MS, static_cast<long>(remaining));
     set(CURLOPT_CONNECTTIMEOUT_MS, static_cast<long>(std::min<int64_t>(request.timeout_ms, 5000)));
     set(CURLOPT_FOLLOWLOCATION, 0L);
@@ -412,7 +418,7 @@ Response Session::perform(const Request &input) const {
     if (attempt < request.retries)
       std::this_thread::sleep_for(std::chrono::milliseconds(request.retry_ms));
   }
-  if (!result.error.empty())
+  if (!result.error.empty() && !request.allow_error)
     throw dslvm::Error("HTTP transport failed: " + result.error);
   if (request.follow &&
       (result.status == 301 || result.status == 302 || result.status == 303 ||
@@ -608,7 +614,7 @@ void register_http(dslvm::Registry &r, Runtime &rt) {
     q.retry_ms = a[1].i;
     return Value::object("Request", p);
   });
-  for (const auto *name : {"follow", "insecure", "http2", "stream"})
+  for (const auto *name : {"follow", "insecure", "http2", "stream", "allow_error"})
     method(r, rt, "Request", name, {"bool"}, "Request", [name](void *p, Args &a) {
       auto &q = *static_cast<Request *>(p);
       std::string n = name;
@@ -618,8 +624,10 @@ void register_http(dslvm::Registry &r, Runtime &rt) {
         q.insecure = a[0].b;
       else if (n == "http2")
         q.http2 = a[0].b;
-      else
+      else if (n == "stream")
         q.stream = a[0].b;
+      else
+        q.allow_error = a[0].b;
       return Value::object("Request", p);
     });
   method(r, rt, "Request", "send", {}, "Response", [&rt](void *p, Args &) {

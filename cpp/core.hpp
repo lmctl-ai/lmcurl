@@ -84,7 +84,7 @@ struct Request {
   std::string auth_user, auth_password, auth_kind;
   int64_t timeout_ms = 10000, retries = 0, retry_ms = 20, max_bytes = 4 * 1024 * 1024;
   bool follow = true, insecure = false, http2 = false, stream = false, llm_budgeted = false;
-  bool literal = false, proxy_set = false;
+  bool literal = false, proxy_set = false, allow_error = false;
   int redirects_left = 5;
   Clock::time_point deadline{};
   Request(Session *s, std::string method, std::string target)

@@ -6,4 +6,4 @@ The runtime owns sockets, cookie jars, variables, response limits, retries, timi
 
 Live provider calls require `LMCURL_LIVE=1`; credentials remain environment-only and are never printed. Cassettes keep public examples offline. LLM cost reservations default to $0.02 per example and cannot exceed $0.25 per process.
 
-Downloader/parser recipes keep the mock site in one bounded lmcurl process while other lmcurl processes download files and lmhtml processes inspect them. Cross-host values travel through caller-selected CSV/text/JSON files. The 258-line registry adds Mock.serve without removing existing signatures.
+Downloader/parser recipes keep the mock site in one bounded lmcurl process while other lmcurl processes download files and lmhtml processes inspect them. Cross-host values travel through caller-selected CSV/text/JSON files. The 259-line registry adds Mock.serve and Request.allow_error without removing existing signatures.

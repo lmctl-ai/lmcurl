@@ -78,4 +78,10 @@ with tempfile.TemporaryDirectory(prefix='lmcurl-native-') as td:
  proxy_env={k:'http://127.0.0.1:1' for k in ('http_proxy','HTTP_PROXY','https_proxy','HTTPS_PROXY','ALL_PROXY','all_proxy')}
  proxy_env.update(NO_PROXY='',no_proxy='')
  run('let m=curl.mock();assert_eq(curl.session(m.url()).get("/json").proxy("").send().status(),200);m.stop();',extra=proxy_env)
+ r=run('curl.session("http://127.0.0.1:1").get("/dead").timeout(500).send();',3)
+ assert 'HTTP transport failed' in r.stderr
+ r=run('curl.session("http://127.0.0.1:1").get("/dead").timeout(500).allow_error(false).send();',3)
+ assert 'HTTP transport failed' in r.stderr
+ run('let m=curl.mock();let bad=curl.session("http://127.0.0.1:1").get("/dead").timeout(500).allow_error(true).send();assert_eq(bad.status(),0);assert_eq(bad.bytes(),0);assert_eq(str_len(bad.error())>0,true);let ok=curl.session(m.url()).get("/json").allow_error(true).send();assert_eq(ok.status(),200);assert_eq(ok.error(),"");file_write("receipt.txt",str(bad.status())+"|"+bad.error()+"|"+str(ok.status()));m.stop();')
+ assert (work/'receipt.txt').read_text().startswith('0|') and (work/'receipt.txt').read_text().endswith('|200')
 print('PASS native HTTP/framework/LLM safety: '+str(passed)+' cases')

@@ -59,4 +59,4 @@ set +e
 set -e
 [[ "$status" == 3 ]]; grep -q 'memory budget exceeded' "$BUILD_DIR/budget.err"; grep -q 'LMCURL_MAX_MEMORY_MB' "$BUILD_DIR/budget.err"
 python3 scripts/check-secrets.py --artifacts
-echo 'PASS: pins, static dependencies/dynamic glibc, exact schema/notices, five DSL suites, 29 native scenarios, gallery and default memory budget'
+echo 'PASS: pins, static dependencies/dynamic glibc, exact schema/notices, five DSL suites, 32 native scenarios, gallery and default memory budget'

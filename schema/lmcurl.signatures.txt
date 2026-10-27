@@ -147,6 +147,7 @@ method Report.passed() -> int
 method Report.save(string) -> void
 method Report.skipped() -> int
 method Report.tap() -> string
+method Request.allow_error(bool) -> Request
 method Request.basic(string, string) -> Request
 method Request.bearer_env(string) -> Request
 method Request.body(string) -> Request
