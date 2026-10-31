@@ -24,5 +24,5 @@ let replay = provider.chat("ping").replay("build/tests/llm-cassette.json").send(
 assert_eq(replay.text(), "pong");
 end _dsl_
 savedsl(p, "build/tests/llm.dslb");
-r = system ${dsl_cli(p)} --dsl build/tests/llm.dslb;
+r = system ${dsl_cli(p)} --lmcode build/tests/llm.dslb;
 assert(r.code == 0);

@@ -12,7 +12,7 @@ file_write("data/llm_sampling.csv",csv);
 m.stop();
 end _dsl_
 savedsl(p,"build/examples/llm_sampling.dslb");
-r = system ${dsl_cli(p)} --dsl build/examples/llm_sampling.dslb;
+r = system ${dsl_cli(p)} --lmcode build/examples/llm_sampling.dslb;
 if(r.code != 0){println(r.stdout);println(r.stderr);}
 assert(r.code==0);
 plot = _dsl_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
@@ -26,7 +26,7 @@ plot.cmd("plot 'data/llm_sampling.csv' every ::1 using 0:2:xtic(1) with boxes lc
 plot.close();
 end _dsl_
 savedsl(plot,"build/examples/llm_sampling-plot.dslb");
-r = system ${dsl_cli(plot)} --dsl build/examples/llm_sampling-plot.dslb;
+r = system ${dsl_cli(plot)} --lmcode build/examples/llm_sampling-plot.dslb;
 assert(r.code==0);
 assert(copy_file("images/llm_sampling.png","docs/images/llm_sampling.png"));
 println("images/llm_sampling.png");

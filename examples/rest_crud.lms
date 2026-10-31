@@ -18,7 +18,7 @@ file_write("data/rest_crud.csv",csv);
 m.stop();
 end _dsl_
 savedsl(p,"build/examples/rest_crud.dslb");
-r = system ${dsl_cli(p)} --dsl build/examples/rest_crud.dslb;
+r = system ${dsl_cli(p)} --lmcode build/examples/rest_crud.dslb;
 if(r.code != 0){println(r.stdout);println(r.stderr);}
 assert(r.code==0);
 plot = _dsl_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
@@ -32,7 +32,7 @@ plot.cmd("plot 'data/rest_crud.csv' every ::1 using 0:2:xtic(1) with boxes lc rg
 plot.close();
 end _dsl_
 savedsl(plot,"build/examples/rest_crud-plot.dslb");
-r = system ${dsl_cli(plot)} --dsl build/examples/rest_crud-plot.dslb;
+r = system ${dsl_cli(plot)} --lmcode build/examples/rest_crud-plot.dslb;
 assert(r.code==0);
 assert(copy_file("images/rest_crud.png","docs/images/rest_crud.png"));
 println("images/rest_crud.png");

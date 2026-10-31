@@ -18,5 +18,5 @@ report.json();
 mock.stop();
 end _dsl_
 savedsl(p, "build/tests/framework.dslb");
-r = system ${dsl_cli(p)} --dsl build/tests/framework.dslb;
+r = system ${dsl_cli(p)} --lmcode build/tests/framework.dslb;
 assert(r.code == 0);

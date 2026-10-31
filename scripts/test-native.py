@@ -12,7 +12,7 @@ with tempfile.TemporaryDirectory(prefix='lmcurl-native-') as td:
   source.write_text('p = _dsl_ cli="lmcurl";\n'+body+'\nend _dsl_\nsavedsl(p,'+json.dumps(str(out))+');\n')
   r=subprocess.run([compiler,str(source)],cwd=work,env=env2,capture_output=True,text=True,timeout=30)
   assert r.returncode==0,'compile failed: '+r.stderr
-  r=subprocess.run([str(host),'--dsl',str(out)],cwd=work,env=env2,capture_output=True,text=True,timeout=40)
+  r=subprocess.run([str(host),'--lmcode',str(out)],cwd=work,env=env2,capture_output=True,text=True,timeout=40)
   assert r.returncode==code,'host exit mismatch: '+str(r.returncode)+' '+r.stdout+' '+r.stderr
   passed+=1;return r
  run('let m=curl.mock(); let s=curl.session(m.url()); assert_eq(s.get("/json").send().status(),200); assert_eq(s.post("/echo").form("a","x y").send().json("$.form.a").value(),"x y");m.stop();')

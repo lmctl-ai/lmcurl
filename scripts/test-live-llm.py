@@ -32,7 +32,7 @@ for name,model,provider in specs:
  compile_result=subprocess.run([compiler,str(source)],cwd=root,env=env2,text=True,capture_output=True,timeout=30)
  if compile_result.returncode:
   row={'provider':name,'requested_model':model,'status':'compile_failed','estimated_cost_usd':0};results.append(row);print(name+': compile_failed');continue
- run=subprocess.run([str(host),'--dsl',str(bytecode)],cwd=root,env=env2,text=True,capture_output=True,timeout=150)
+ run=subprocess.run([str(host),'--lmcode',str(bytecode)],cwd=root,env=env2,text=True,capture_output=True,timeout=150)
  # Never persist raw stdout/stderr; journal and normalized result are redacted by the host.
  events=[json.loads(l) for l in journal.read_text().splitlines()] if journal.exists() else []
  settled=[v for v in events if v.get('event')=='settled'];reserved=[v for v in events if v.get('event')=='reserved'];amount=sum(float(v['estimated_cost_usd']) for v in settled)

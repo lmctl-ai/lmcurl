@@ -12,7 +12,7 @@ file_write("data/redirect_chain.csv",csv);
 m.stop();
 end _dsl_
 savedsl(p,"build/examples/redirect_chain.dslb");
-r = system ${dsl_cli(p)} --dsl build/examples/redirect_chain.dslb;
+r = system ${dsl_cli(p)} --lmcode build/examples/redirect_chain.dslb;
 if(r.code != 0){println(r.stdout);println(r.stderr);}
 assert(r.code==0);
 plot = _dsl_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
@@ -26,7 +26,7 @@ plot.cmd("plot 'data/redirect_chain.csv' every ::1 using 0:2:xtic(1) with boxes 
 plot.close();
 end _dsl_
 savedsl(plot,"build/examples/redirect_chain-plot.dslb");
-r = system ${dsl_cli(plot)} --dsl build/examples/redirect_chain-plot.dslb;
+r = system ${dsl_cli(plot)} --lmcode build/examples/redirect_chain-plot.dslb;
 assert(r.code==0);
 assert(copy_file("images/redirect_chain.png","docs/images/redirect_chain.png"));
 println("images/redirect_chain.png");

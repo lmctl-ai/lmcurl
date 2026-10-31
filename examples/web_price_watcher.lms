@@ -10,7 +10,7 @@ fn check(ok, message) {
 }
 fn run_program(program, path) {
   savedsl(program, path);
-  r = system ${dsl_cli(program)} --dsl ${path};
+  r = system ${dsl_cli(program)} --lmcode ${path};
   if (r.code != 0) { println(r.stderr); }
   check(r.code == 0, "native stage failed: " + path);
   return r;

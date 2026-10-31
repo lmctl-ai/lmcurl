@@ -11,7 +11,7 @@ file_write("data/json_cases.csv",csv);
 m.stop();
 end _dsl_
 savedsl(p,"build/examples/json_cases.dslb");
-r = system ${dsl_cli(p)} --dsl build/examples/json_cases.dslb;
+r = system ${dsl_cli(p)} --lmcode build/examples/json_cases.dslb;
 if(r.code != 0){println(r.stdout);println(r.stderr);}
 assert(r.code==0);
 plot = _dsl_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
@@ -25,7 +25,7 @@ plot.cmd("plot 'data/json_cases.csv' every ::1 using 0:2:xtic(1) with boxes lc r
 plot.close();
 end _dsl_
 savedsl(plot,"build/examples/json_cases-plot.dslb");
-r = system ${dsl_cli(plot)} --dsl build/examples/json_cases-plot.dslb;
+r = system ${dsl_cli(plot)} --lmcode build/examples/json_cases-plot.dslb;
 assert(r.code==0);
 assert(copy_file("images/json_cases.png","docs/images/json_cases.png"));
 println("images/json_cases.png");

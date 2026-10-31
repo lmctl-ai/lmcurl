@@ -13,7 +13,7 @@ file_write("data/jsonpath_projection.csv",csv);
 m.stop();
 end _dsl_
 savedsl(p,"build/examples/jsonpath_projection.dslb");
-r = system ${dsl_cli(p)} --dsl build/examples/jsonpath_projection.dslb;
+r = system ${dsl_cli(p)} --lmcode build/examples/jsonpath_projection.dslb;
 if(r.code != 0){println(r.stdout);println(r.stderr);}
 assert(r.code==0);
 plot = _dsl_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
@@ -27,7 +27,7 @@ plot.cmd("plot 'data/jsonpath_projection.csv' every ::1 using 0:2:xtic(1) with b
 plot.close();
 end _dsl_
 savedsl(plot,"build/examples/jsonpath_projection-plot.dslb");
-r = system ${dsl_cli(plot)} --dsl build/examples/jsonpath_projection-plot.dslb;
+r = system ${dsl_cli(plot)} --lmcode build/examples/jsonpath_projection-plot.dslb;
 assert(r.code==0);
 assert(copy_file("images/jsonpath_projection.png","docs/images/jsonpath_projection.png"));
 println("images/jsonpath_projection.png");

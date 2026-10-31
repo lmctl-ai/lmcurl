@@ -13,7 +13,7 @@ file_write("data/cookie_jar.csv",csv);
 m.stop();
 end _dsl_
 savedsl(p,"build/examples/cookie_jar.dslb");
-r = system ${dsl_cli(p)} --dsl build/examples/cookie_jar.dslb;
+r = system ${dsl_cli(p)} --lmcode build/examples/cookie_jar.dslb;
 if(r.code != 0){println(r.stdout);println(r.stderr);}
 assert(r.code==0);
 plot = _dsl_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
@@ -27,7 +27,7 @@ plot.cmd("plot 'data/cookie_jar.csv' every ::1 using 0:2:xtic(1) with boxes lc r
 plot.close();
 end _dsl_
 savedsl(plot,"build/examples/cookie_jar-plot.dslb");
-r = system ${dsl_cli(plot)} --dsl build/examples/cookie_jar-plot.dslb;
+r = system ${dsl_cli(plot)} --lmcode build/examples/cookie_jar-plot.dslb;
 assert(r.code==0);
 assert(copy_file("images/cookie_jar.png","docs/images/cookie_jar.png"));
 println("images/cookie_jar.png");

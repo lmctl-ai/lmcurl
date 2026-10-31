@@ -25,7 +25,7 @@ int main(int argc, char **argv) {
                       lmcurl::embedded_notices_size);
       return 0;
     }
-    if (argc >= 2 && std::string(argv[1]) == "--dsl-schema") {
+    if (argc >= 2 && std::string(argv[1]) == "--lmcode-schema") {
       if (argc == 3 && std::string(argv[2]) == "--json") {
         std::cout.write(reinterpret_cast<const char *>(lmcurl::embedded_schema),
                         lmcurl::embedded_schema_size);
@@ -37,7 +37,7 @@ int main(int argc, char **argv) {
         std::cout << s << '\n';
       return 0;
     }
-    if (argc == 2 && std::string(argv[1]) == "--dsl-signatures") {
+    if (argc == 2 && std::string(argv[1]) == "--lmcode-signatures") {
       for (const auto &s : registry.signatures())
         std::cout << s << '\n';
       return 0;
@@ -45,8 +45,8 @@ int main(int argc, char **argv) {
     if (argc == 2 && (std::string(argv[1]) == "--help" || std::string(argv[1]) == "-h")) {
       std::cout
           << "lmcurl " LMCURL_VERSION
-             " - libcurl REST and LLM tests\n--dsl FILE [FILE ...] [--dry-run] | --dsl-schema "
-             "[--json] | --dsl-signatures | --version | --notices\nLMCURL_MAX_MEMORY_MB: positive "
+             " - libcurl REST and LLM tests\n--lmcode FILE [FILE ...] [--dry-run] | --lmcode-schema "
+             "[--json] | --lmcode-signatures | --version | --notices\nLMCURL_MAX_MEMORY_MB: positive "
              "whole MiB (default 4096).\nLMCURL_LIVE=1 enables paid LLM calls; LMCURL_MAX_COST_USD "
              "defaults 0.02, hard run ceiling 0.25.\nLinux requires glibc >=2.35; all other "
              "libraries are static.\n";
@@ -57,7 +57,7 @@ int main(int argc, char **argv) {
     bool dsl = false;
     for (int i = 1; i < argc; ++i) {
       std::string a = argv[i];
-      if (a == "--dsl" && !dsl) {
+      if (a == "--lmcode" && !dsl) {
         dsl = true;
       } else if (a == "--dry-run" && !dry) {
         dry = true;

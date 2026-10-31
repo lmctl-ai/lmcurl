@@ -11,9 +11,42 @@ fn file_lines(string) -> StrList
 fn file_read(string) -> string
 fn file_write(string, string) -> void
 fn float_list() -> FloatList
+fn float_map() -> FloatMap
+fn float_pq() -> FloatPQ
+fn float_queue() -> FloatQueue
+fn float_stack() -> FloatStack
 fn int_list() -> IntList
+fn int_map() -> IntMap
+fn int_pq() -> IntPQ
+fn int_queue() -> IntQueue
+fn int_stack() -> IntStack
+fn json_parse(string) -> Json
 fn llm_calls() -> int
 fn llm_cost() -> float
+fn lmcode_return_null() -> void
+fn lmcode_return_put(string, FloatList) -> void
+fn lmcode_return_put(string, FloatMap) -> void
+fn lmcode_return_put(string, IntList) -> void
+fn lmcode_return_put(string, IntMap) -> void
+fn lmcode_return_put(string, Json) -> void
+fn lmcode_return_put(string, StrList) -> void
+fn lmcode_return_put(string, StrMap) -> void
+fn lmcode_return_put(string, bool) -> void
+fn lmcode_return_put(string, float) -> void
+fn lmcode_return_put(string, int) -> void
+fn lmcode_return_put(string, string) -> void
+fn lmcode_return_put_null(string) -> void
+fn lmcode_return_set(FloatList) -> void
+fn lmcode_return_set(FloatMap) -> void
+fn lmcode_return_set(IntList) -> void
+fn lmcode_return_set(IntMap) -> void
+fn lmcode_return_set(Json) -> void
+fn lmcode_return_set(StrList) -> void
+fn lmcode_return_set(StrMap) -> void
+fn lmcode_return_set(bool) -> void
+fn lmcode_return_set(float) -> void
+fn lmcode_return_set(int) -> void
+fn lmcode_return_set(string) -> void
 fn math_abs(float) -> float
 fn math_abs(int) -> int
 fn math_ceil(float) -> float
@@ -32,9 +65,13 @@ fn math_sqrt(float) -> float
 fn math_sqrt(int) -> int
 fn print(string) -> void
 fn println(string) -> void
+fn str_base64_decode(string) -> string
+fn str_base64_encode(string) -> string
 fn str_contains(string, string) -> bool
 fn str_ends_with(string, string) -> bool
 fn str_find(string, string) -> int
+fn str_hex_decode(string) -> string
+fn str_hex_encode(string) -> string
 fn str_is_float(string) -> bool
 fn str_is_int(string) -> bool
 fn str_len(string) -> int
@@ -42,15 +79,19 @@ fn str_list() -> StrList
 fn str_lower(string) -> string
 fn str_map() -> StrMap
 fn str_match(string, string) -> bool
+fn str_pq() -> StrPQ
+fn str_queue() -> StrQueue
 fn str_repeat(string, int) -> string
 fn str_replace(string, string, string) -> string
 fn str_split(string, string) -> StrList
+fn str_stack() -> StrStack
 fn str_starts_with(string, string) -> bool
 fn str_substr(string, int, int) -> string
 fn str_to_float(string) -> float
 fn str_to_int(string) -> int
 fn str_trim(string) -> string
 fn str_upper(string) -> string
+fn template_render(string, Json) -> string
 method Chat.assistant(string) -> Chat
 method Chat.cassette(string) -> Chat
 method Chat.json_mode(bool) -> Chat
@@ -81,6 +122,36 @@ method FloatList.contains(float) -> bool
 method FloatList.index_of(float) -> int
 method FloatList.len() -> int
 method FloatList.set(int, float) -> FloatList
+method FloatMap.clear() -> FloatMap
+method FloatMap.get(string) -> float
+method FloatMap.get_or(string, float) -> float
+method FloatMap.has(string) -> bool
+method FloatMap.key_at(int) -> string
+method FloatMap.keys() -> StrList
+method FloatMap.len() -> int
+method FloatMap.remove(string) -> bool
+method FloatMap.set(string, float) -> FloatMap
+method FloatMap.values() -> FloatList
+method FloatPQ.clear() -> FloatPQ
+method FloatPQ.empty() -> bool
+method FloatPQ.len() -> int
+method FloatPQ.peek() -> float
+method FloatPQ.pop() -> float
+method FloatPQ.push(float, float) -> FloatPQ
+method FloatQueue.at(int) -> float
+method FloatQueue.clear() -> FloatQueue
+method FloatQueue.empty() -> bool
+method FloatQueue.len() -> int
+method FloatQueue.peek() -> float
+method FloatQueue.pop() -> float
+method FloatQueue.push(float) -> FloatQueue
+method FloatStack.at(int) -> float
+method FloatStack.clear() -> FloatStack
+method FloatStack.empty() -> bool
+method FloatStack.len() -> int
+method FloatStack.peek() -> float
+method FloatStack.pop() -> float
+method FloatStack.push(float) -> FloatStack
 method IntList.add(int) -> IntList
 method IntList.at(int) -> int
 method IntList.clear() -> IntList
@@ -88,6 +159,47 @@ method IntList.contains(int) -> bool
 method IntList.index_of(int) -> int
 method IntList.len() -> int
 method IntList.set(int, int) -> IntList
+method IntMap.clear() -> IntMap
+method IntMap.get(string) -> int
+method IntMap.get_or(string, int) -> int
+method IntMap.has(string) -> bool
+method IntMap.key_at(int) -> string
+method IntMap.keys() -> StrList
+method IntMap.len() -> int
+method IntMap.remove(string) -> bool
+method IntMap.set(string, int) -> IntMap
+method IntMap.values() -> IntList
+method IntPQ.clear() -> IntPQ
+method IntPQ.empty() -> bool
+method IntPQ.len() -> int
+method IntPQ.peek() -> int
+method IntPQ.pop() -> int
+method IntPQ.push(int, float) -> IntPQ
+method IntQueue.at(int) -> int
+method IntQueue.clear() -> IntQueue
+method IntQueue.empty() -> bool
+method IntQueue.len() -> int
+method IntQueue.peek() -> int
+method IntQueue.pop() -> int
+method IntQueue.push(int) -> IntQueue
+method IntStack.at(int) -> int
+method IntStack.clear() -> IntStack
+method IntStack.empty() -> bool
+method IntStack.len() -> int
+method IntStack.peek() -> int
+method IntStack.pop() -> int
+method IntStack.push(int) -> IntStack
+method Json.as_bool() -> bool
+method Json.as_float() -> float
+method Json.as_int() -> int
+method Json.as_string() -> string
+method Json.at(int) -> Json
+method Json.get(string) -> Json
+method Json.has(string) -> bool
+method Json.keys() -> StrList
+method Json.kind() -> string
+method Json.len() -> int
+method Json.to_json() -> string
 method Llm.deepseek(string) -> Provider
 method Llm.ledger(string) -> void
 method Llm.mock(string) -> Provider
@@ -232,9 +344,31 @@ method StrMap.get(string) -> string
 method StrMap.get_or(string, string) -> string
 method StrMap.has(string) -> bool
 method StrMap.key_at(int) -> string
+method StrMap.keys() -> StrList
 method StrMap.len() -> int
 method StrMap.remove(string) -> bool
 method StrMap.set(string, string) -> StrMap
+method StrMap.values() -> StrList
+method StrPQ.clear() -> StrPQ
+method StrPQ.empty() -> bool
+method StrPQ.len() -> int
+method StrPQ.peek() -> string
+method StrPQ.pop() -> string
+method StrPQ.push(string, float) -> StrPQ
+method StrQueue.at(int) -> string
+method StrQueue.clear() -> StrQueue
+method StrQueue.empty() -> bool
+method StrQueue.len() -> int
+method StrQueue.peek() -> string
+method StrQueue.pop() -> string
+method StrQueue.push(string) -> StrQueue
+method StrStack.at(int) -> string
+method StrStack.clear() -> StrStack
+method StrStack.empty() -> bool
+method StrStack.len() -> int
+method StrStack.peek() -> string
+method StrStack.pop() -> string
+method StrStack.push(string) -> StrStack
 method Suite.after(Request) -> Suite
 method Suite.before(Request) -> Suite
 method Suite.data_csv(string) -> Suite

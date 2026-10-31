@@ -11,7 +11,7 @@ file_write("data/snapshot_contract.csv",csv);
 m.stop();
 end _dsl_
 savedsl(p,"build/examples/snapshot_contract.dslb");
-r = system ${dsl_cli(p)} --dsl build/examples/snapshot_contract.dslb;
+r = system ${dsl_cli(p)} --lmcode build/examples/snapshot_contract.dslb;
 if(r.code != 0){println(r.stdout);println(r.stderr);}
 assert(r.code==0);
 plot = _dsl_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
@@ -25,7 +25,7 @@ plot.cmd("plot 'data/snapshot_contract.csv' every ::1 using 0:2:xtic(1) with box
 plot.close();
 end _dsl_
 savedsl(plot,"build/examples/snapshot_contract-plot.dslb");
-r = system ${dsl_cli(plot)} --dsl build/examples/snapshot_contract-plot.dslb;
+r = system ${dsl_cli(plot)} --lmcode build/examples/snapshot_contract-plot.dslb;
 assert(r.code==0);
 assert(copy_file("images/snapshot_contract.png","docs/images/snapshot_contract.png"));
 println("images/snapshot_contract.png");

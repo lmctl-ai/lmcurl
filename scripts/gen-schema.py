@@ -5,7 +5,7 @@ root=Path(__file__).resolve().parents[1]
 host=sys.argv[1] if len(sys.argv)>1 else str(root/'build/lmcurl')
 types,functions,context={},{},{}
 pattern=re.compile(r'^(?:fn (\w+)|method (\w+)\.(\w+))\((.*?)\) -> (\w+)$')
-signatures=subprocess.check_output([host,'--dsl-signatures'],text=True,timeout=30)
+signatures=subprocess.check_output([host,'--lmcode-signatures'],text=True,timeout=30)
 (root/'schema/lmcurl.signatures.txt').write_text(signatures)
 for line in signatures.splitlines():
  if line.startswith('context '):name,typ=line[8:].split(': ');context[name]=typ;continue

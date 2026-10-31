@@ -12,7 +12,7 @@ file_write("data/tag_filter.csv",csv);
 m.stop();
 end _dsl_
 savedsl(p,"build/examples/tag_filter.dslb");
-r = system ${dsl_cli(p)} --dsl build/examples/tag_filter.dslb;
+r = system ${dsl_cli(p)} --lmcode build/examples/tag_filter.dslb;
 if(r.code != 0){println(r.stdout);println(r.stderr);}
 assert(r.code==0);
 plot = _dsl_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
@@ -26,7 +26,7 @@ plot.cmd("plot 'data/tag_filter.csv' every ::1 using 0:2:xtic(1) with boxes lc r
 plot.close();
 end _dsl_
 savedsl(plot,"build/examples/tag_filter-plot.dslb");
-r = system ${dsl_cli(plot)} --dsl build/examples/tag_filter-plot.dslb;
+r = system ${dsl_cli(plot)} --lmcode build/examples/tag_filter-plot.dslb;
 assert(r.code==0);
 assert(copy_file("images/tag_filter.png","docs/images/tag_filter.png"));
 println("images/tag_filter.png");

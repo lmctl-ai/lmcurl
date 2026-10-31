@@ -9,7 +9,7 @@ if not a.render:
  for row in catalog:
   image=root/row['image'];data=image.read_bytes();assert data[:8]==b'\x89PNG\r\n\x1a\n' and len(data)<=307200,image
  print('PASS gallery assets: '+str(len(catalog)));raise SystemExit(0)
-env=dict(os.environ,LMCURL_LIVE='0');env['PATH']=str(host.parent)+':/home/mma/repos/dsl/lmplot/build:/home/mma/repos/dsl/lmdraw/build:'+env['PATH']
+env=dict(os.environ,LMCURL_LIVE='0');env['PATH']=str(host.parent)+os.pathsep+env['PATH']
 compiler=subprocess.check_output([str(root/'scripts/select-compiler.sh')],text=True,env=env,timeout=30).strip()
 fail=[]
 for row in catalog:

@@ -23,5 +23,5 @@ assert_eq(curl.schema_valid("{\"x\":1}", "{\"type\":\"object\",\"required\":[\"x
 assert_eq(curl.schema_valid("{}", "{\"type\":\"object\",\"required\":[\"x\"]}"), false);
 end _dsl_
 savedsl(p, "build/tests/query.dslb");
-r = system ${dsl_cli(p)} --dsl build/tests/query.dslb;
+r = system ${dsl_cli(p)} --lmcode build/tests/query.dslb;
 assert(r.code == 0);

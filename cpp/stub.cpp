@@ -25,12 +25,12 @@ int main(int argc, char **argv) {
                     lmcurl::embedded_notices_size);
     return 0;
   }
-  if (a == "--dsl-schema" && argc == 3 && std::string(argv[2]) == "--json") {
+  if (a == "--lmcode-schema" && argc == 3 && std::string(argv[2]) == "--json") {
     std::cout.write(reinterpret_cast<const char *>(lmcurl::embedded_schema),
                     lmcurl::embedded_schema_size);
     return 0;
   }
-  if ((a == "--dsl-signatures" || a == "--dsl-schema") && argc == 2) {
+  if ((a == "--lmcode-signatures" || a == "--lmcode-schema") && argc == 2) {
     std::cout.write(reinterpret_cast<const char *>(lmcurl::embedded_signatures),
                     lmcurl::embedded_signatures_size);
     return 0;
@@ -41,5 +41,5 @@ int main(int argc, char **argv) {
     return 0;
   }
   std::cerr << "lmcurl: network/DSL execution is not supported on this platform yet\n";
-  return a == "--dsl" ? 3 : 2;
+  return a == "--lmcode" ? 3 : 2;
 }

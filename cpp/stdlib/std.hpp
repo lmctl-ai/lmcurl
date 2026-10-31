@@ -7,12 +7,17 @@
 #include "math.hpp"
 #include "collections.hpp"
 #include "file.hpp"
+#include "containers.hpp"
+#include "json.hpp"
+#include "encoding.hpp"
+#include "result.hpp"
 #undef DSLVM_STD_BUILDING
 
 namespace dslvm {
 namespace stdlib {
 struct StdRuntime {
   Collections collections;
+  ResultSink* result_sink = nullptr; // external lifetime, outside collection reset
   std::atomic<bool> running{false};
 };
 } // namespace stdlib
@@ -29,9 +34,13 @@ inline Registry& register_std(Registry& registry) {
   candidate.std_runtime_ = std::make_shared<stdlib::StdRuntime>();
   const auto before = candidate.signatures();
   stdlib::register_string(candidate);
+  stdlib::register_encoding(candidate);
   stdlib::register_math(candidate);
   stdlib::register_collections(candidate, candidate.std_runtime_->collections);
   stdlib::register_file(candidate, candidate.std_runtime_->collections);
+  stdlib::register_containers(candidate, candidate.std_runtime_->collections);
+  stdlib::register_json(candidate, candidate.std_runtime_->collections);
+  stdlib::register_results(candidate, candidate.std_runtime_->result_sink);
   const auto after = candidate.signatures();
   std::set_difference(after.begin(), after.end(), before.begin(), before.end(), std::back_inserter(candidate.std_signatures_));
   candidate.std_initialized_ = true;
@@ -42,6 +51,10 @@ inline Registry& register_std(Registry& registry) {
 inline stdlib::Collections& Registry::std_collections() const {
   if (!has_std()) throw Error("std: registry has standard library disabled");
   return std_runtime_->collections;
+}
+inline void Registry::set_result_sink(ResultSink* sink) {
+  if (!has_std()) throw Error("std: registry has standard library disabled");
+  std_runtime_->result_sink = sink;
 }
 inline void Registry::set_std_output(std::ostream* sink) {
   std_output_ = sink ? sink : &std::cout;

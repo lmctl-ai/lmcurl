@@ -11,7 +11,7 @@ file_write("data/llm_streams.csv",csv);
 m.stop();
 end _dsl_
 savedsl(p,"build/examples/llm_streams.dslb");
-r = system ${dsl_cli(p)} --dsl build/examples/llm_streams.dslb;
+r = system ${dsl_cli(p)} --lmcode build/examples/llm_streams.dslb;
 if(r.code != 0){println(r.stdout);println(r.stderr);}
 assert(r.code==0);
 plot = _dsl_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
@@ -25,7 +25,7 @@ plot.cmd("plot 'data/llm_streams.csv' every ::1 using 0:2:xtic(1) with boxes lc 
 plot.close();
 end _dsl_
 savedsl(plot,"build/examples/llm_streams-plot.dslb");
-r = system ${dsl_cli(plot)} --dsl build/examples/llm_streams-plot.dslb;
+r = system ${dsl_cli(plot)} --lmcode build/examples/llm_streams-plot.dslb;
 assert(r.code==0);
 assert(copy_file("images/llm_streams.png","docs/images/llm_streams.png"));
 println("images/llm_streams.png");

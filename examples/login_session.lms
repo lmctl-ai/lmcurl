@@ -14,7 +14,7 @@ file_write("data/login_session.csv",csv);
 m.stop();
 end _dsl_
 savedsl(p,"build/examples/login_session.dslb");
-r = system ${dsl_cli(p)} --dsl build/examples/login_session.dslb;
+r = system ${dsl_cli(p)} --lmcode build/examples/login_session.dslb;
 if(r.code != 0){println(r.stdout);println(r.stderr);}
 assert(r.code==0);
 draw = _dsl_ cli="lmdraw" install="github:lmctl-ai/lmdraw@latest";
@@ -40,7 +40,7 @@ scene.text(48.0,520.0,14.0,"Fixture secrets are redacted from exported artifacts
 scene.render_png("images/login_session.png",900,560,1);
 end _dsl_
 savedsl(draw,"build/examples/login_session-draw.dslb");
-r = system ${dsl_cli(draw)} --dsl build/examples/login_session-draw.dslb;
+r = system ${dsl_cli(draw)} --lmcode build/examples/login_session-draw.dslb;
 assert(r.code==0);
 assert(copy_file("images/login_session.png","docs/images/login_session.png"));
 println("images/login_session.png");

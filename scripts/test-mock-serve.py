@@ -35,7 +35,7 @@ def compile_program(source: str, directory: Path) -> Path:
 
 def run_host(bytecode: Path, timeout: float = 5.0) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        [str(HOST), "--dsl", str(bytecode)],
+        [str(HOST), "--lmcode", str(bytecode)],
         cwd=bytecode.parent,
         env=env,
         capture_output=True,
@@ -60,7 +60,7 @@ with tempfile.TemporaryDirectory(prefix="lmcurl-serve-") as raw:
     ready, stop = root / "ready.url", root / "stop.signal"
     bytecode = compile_program(f'let m=curl.mock();m.serve("{ready}","{stop}",2000);', root)
     process = subprocess.Popen(
-        [str(HOST), "--dsl", str(bytecode)], cwd=root, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        [str(HOST), "--lmcode", str(bytecode)], cwd=root, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
     )
     url = wait_ready(ready)
     with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(url + "/json", timeout=2) as response:
@@ -78,7 +78,7 @@ with tempfile.TemporaryDirectory(prefix="lmcurl-serve-") as raw:
             pass
 
     timeout_bytecode = compile_program(f'let m=curl.mock();m.serve("{root / "timeout.url"}","{root / "never.signal"}",200);', root)
-    process = subprocess.Popen([str(HOST), "--dsl", str(timeout_bytecode)], cwd=root, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    process = subprocess.Popen([str(HOST), "--lmcode", str(timeout_bytecode)], cwd=root, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     timeout_url = wait_ready(root / "timeout.url")
     stdout, stderr = process.communicate(timeout=5)
     assert process.returncode == 3 and "timed out waiting for stop file" in stderr, stderr

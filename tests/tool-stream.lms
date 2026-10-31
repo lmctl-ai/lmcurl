@@ -7,5 +7,5 @@ assert_eq(result.tools(), "[{\"function\":{\"arguments\":\"{\\\"city\\\":\\\"Par
 mock.stop();
 end _dsl_
 savedsl(p, "build/tests/tool-stream.dslb");
-r = system ${dsl_cli(p)} --dsl build/tests/tool-stream.dslb;
+r = system ${dsl_cli(p)} --lmcode build/tests/tool-stream.dslb;
 assert(r.code == 0);
