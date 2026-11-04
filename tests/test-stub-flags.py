@@ -18,7 +18,7 @@ with tempfile.TemporaryDirectory(prefix='curl stub flags ') as directory:
                     str(ROOT/'cpp/stub.cpp'),'-o',str(binary)],check=True,capture_output=True)
     old = '--'+'dsl'
     failures=[]
-    for flag, rest in [(old,['missing.dslb']),(old+'-schema',['--json']),(old+'-signatures',[])]:
+    for flag, rest in [(old,['missing.bin']),(old+'-schema',['--json']),(old+'-signatures',[])]:
         r=subprocess.run([str(binary),flag,*rest],capture_output=True)
         if r.returncode != 2:failures.append((flag,r.returncode))
     assert not failures,('stub retained old options',failures)
@@ -26,6 +26,6 @@ with tempfile.TemporaryDirectory(prefix='curl stub flags ') as directory:
                           (['--lmcode-signatures'],(ROOT/'schema/lmcurl.signatures.txt').read_bytes())]:
         r=subprocess.run([str(binary),*args],capture_output=True)
         assert (r.returncode,r.stdout,r.stderr)==(0,expected,b''),r
-    r=subprocess.run([str(binary),'--lmcode','missing.dslb'],capture_output=True)
+    r=subprocess.run([str(binary),'--lmcode','missing.bin'],capture_output=True)
     assert r.returncode==3 and b'not supported' in r.stderr and not r.stdout,r
 print('PASS actual compiled stub: exact metadata, retired refusal and unchanged unsupported execution')

@@ -1,6 +1,6 @@
 mkdir("data"); mkdir("images"); mkdir("reports"); mkdir("build/examples"); mkdir("docs/images");
 
-p = _dsl_ cli="lmcurl" install="github:lmctl-ai/lmcurl@latest";
+p = _lmcode_ cli="lmcurl" install="github:lmctl-ai/lmcurl@latest";
 let m=curl.mock();
 let s=curl.session(m.url());
 let r=s.get("/json").send();let items=r.json("$.items[*]");assert_eq(items.count(),3);assert_eq(items.nth(1).to_int(),2);
@@ -11,12 +11,10 @@ csv=csv+"item count,"+str(items.count())+"\n";
 csv=csv+"second item,"+str(items.nth(1).to_int())+"\n";
 file_write("data/jsonpath_projection.csv",csv);
 m.stop();
-end _dsl_
-savedsl(p,"build/examples/jsonpath_projection.dslb");
-r = system ${dsl_cli(p)} --lmcode build/examples/jsonpath_projection.dslb;
-if(r.code != 0){println(r.stdout);println(r.stderr);}
-assert(r.code==0);
-plot = _dsl_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+end _lmcode_
+r = run_lmcode(p);
+require(r.ok,json_stringify(r));
+plot = _lmcode_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
 plot.png("images/jsonpath_projection.png",900,560);
 plot.cmd("set datafile separator ','");
 plot.cmd("set title \"Typed JSONPath projections and predicates\"");
@@ -25,9 +23,8 @@ plot.cmd("set xtics rotate by -15 font ',10'");
 plot.cmd("set ylabel \"observed value\"");
 plot.cmd("plot 'data/jsonpath_projection.csv' every ::1 using 0:2:xtic(1) with boxes lc rgb '#0969da', '' every ::1 using 0:2:(sprintf('%.3g',$2)) with labels offset 0,0.8");
 plot.close();
-end _dsl_
-savedsl(plot,"build/examples/jsonpath_projection-plot.dslb");
-r = system ${dsl_cli(plot)} --lmcode build/examples/jsonpath_projection-plot.dslb;
-assert(r.code==0);
+end _lmcode_
+r = run_lmcode(plot);
+require(r.ok,json_stringify(r));
 assert(copy_file("images/jsonpath_projection.png","docs/images/jsonpath_projection.png"));
 println("images/jsonpath_projection.png");

@@ -6,7 +6,6 @@
 /cassettes/
 /.omx/
 __pycache__/
-*.dslb
 *.log
 *.lmctl
 .lmctl/

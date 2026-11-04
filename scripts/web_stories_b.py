@@ -4,7 +4,7 @@ def add(name,title,story,**options): STORIES.append(dict(name=name,title=title,s
 
 add('web_seo_audit','SEO audit: metadata, headings and image alternatives',r'''
 x=download(base,"/site/seo.html","data/seo.html",true);check(x.status==200,"SEO download");
-p=_dsl_ cli="lmhtml" install="github:lmctl-ai/lmhtml@latest";
+p=_lmcode_ cli="lmhtml" install="github:lmctl-ai/lmhtml@latest";
 let d=html.load("data/seo.html");
 let titles=d.select("title");let meta=d.select("meta[name=description]");let h1=d.select("h1");let images=d.select("img");
 let missing_title=0;if(titles.len()==0){missing_title=1;}
@@ -16,18 +16,18 @@ assert_close(float(titles.len()),1.0,0.000001);assert_close(float(missing_meta),
 assert_close(float(extra_h1),1.0,0.000001);assert_close(float(bad_alt),1.0,0.000001);
 file_write("data/web_seo_audit.csv","metric,value\nmissing title,"+str(missing_title)+"\nmissing description,"+str(missing_meta)+"\nextra h1,"+str(extra_h1)+"\nimages missing alt,"+str(bad_alt)+"\n");
 report.write_json("reports/seo-findings.json");
-end _dsl_
-run_program(p,"build/seo-parser.dslb");
+end _lmcode_
+run_program(p,"seo-parser");
 ''')
 
 add('web_image_redirect_audit','Find broken image URLs and follow every redirect hop',r'''
 x=download(base,"/site/audit.html","data/audit.html",true);check(x.status==200,"image audit download");
-p=_dsl_ cli="lmhtml" install="github:lmctl-ai/lmhtml@latest";
+p=_lmcode_ cli="lmhtml" install="github:lmctl-ai/lmhtml@latest";
 let d=html.load("data/audit.html");let images=d.select("img");file_write("data/image-urls.txt","");
 for(i in range(0,images.len())){file_append("data/image-urls.txt",images.at(i).attr("src")+"\n");}
 file_write("data/redirect-url.txt",d.select("a").at(0).attr("href"));
-end _dsl_
-run_program(p,"build/images-parser.dslb");
+end _lmcode_
+run_program(p,"images-parser");
 checked=0;broken=0;report="url,status\n";
 for(route in read_lines("data/image-urls.txt")){
  if(is_blank(route)){continue;}
@@ -48,12 +48,12 @@ add('web_api_html_consistency','Compare each product SKU, price and stock with t
 # Fixed fan-out; replace this list with parallel_map when the compiler exposes it.
 responses=parallel([download(base,"/site/products.html","data/products.html",true),download(base,"/site/api/products.json","data/api-products.json",true)]);
 check(responses[0].status==200&&responses[1].status==200,"HTML/API downloads");
-p=_dsl_ cli="lmhtml" install="github:lmctl-ai/lmhtml@latest";
+p=_lmcode_ cli="lmhtml" install="github:lmctl-ai/lmhtml@latest";
 let rows=html.load("data/products.html").select("table tbody tr");
 file_write("data/html-products.csv","sku,price,stock\n");
 for(i in range(0,rows.len())){let cells=rows.at(i).select("td");if(cells.len()==3){file_append("data/html-products.csv",cells.at(0).text()+","+cells.at(1).text()+","+cells.at(2).text()+"\n");}}
-end _dsl_
-run_program(p,"build/consistency-parser.dslb");
+end _lmcode_
+run_program(p,"consistency-parser");
 html_rows=read_csv("data/html-products.csv");api=read_json("data/api-products.json").products;
 check(html_rows.len()==3&&api.len()==html_rows.len(),"product counts");mismatches=0;report="sku,field,html,api\n";
 for(i in range(0,html_rows.len())){
@@ -73,7 +73,7 @@ a=download(base,"/site/changes.html","data/before.html",true);
 b=download(base,"/site/changes.html","data/after.html",true);
 c=download(base,"/site/changes.html","data/unchanged.html",true);
 check(a.status==200&&b.status==200&&c.status==200,"content crawls");
-p=_dsl_ cli="lmhtml" install="github:lmctl-ai/lmhtml@latest";
+p=_lmcode_ cli="lmhtml" install="github:lmctl-ai/lmhtml@latest";
 let before=html.load("data/before.html");let after=html.load("data/after.html");let stable=html.load("data/unchanged.html");
 let changed=html.diff(before,after);let unchanged=html.diff(after,stable);
 if(changed<=0){report.add("assertion","diff",0,"changed content not detected");report.fail_if_any();}
@@ -81,8 +81,8 @@ assert_close(float(unchanged),0.0,0.000001);
 file_write("data/diff-before.txt",before.select("p").at(0).text());file_write("data/diff-after.txt",after.select("p").at(0).text());
 file_write("data/diff-count.txt",str(changed));
 file_write("data/web_content_diff.csv","metric,value\nchanged crawl,"+str(changed)+"\nstable crawl,"+str(unchanged)+"\n");
-end _dsl_
-run_program(p,"build/diff-parser.dslb");
+end _lmcode_
+run_program(p,"diff-parser");
 ''',draw=r'''
 scene.canvas(900,560,"#0d1726");
 scene.text(50.0,65.0,28.0,"Two crawls, one real content change","#edf5ff");
@@ -101,7 +101,7 @@ scene.render_png("images/web_content_diff.png",900,560,1);
 
 add('web_accessibility_scan','Scan basic labels, image alternatives and empty controls',r'''
 x=download(base,"/site/a11y.html","data/a11y.html",true);check(x.status==200,"accessibility download");
-p=_dsl_ cli="lmhtml" install="github:lmctl-ai/lmhtml@latest";
+p=_lmcode_ cli="lmhtml" install="github:lmctl-ai/lmhtml@latest";
 let d=html.load("data/a11y.html");let images=d.select("img");let inputs=d.select("input");let labels=d.select("label");
 let missing_alt=0;let unlabeled=0;let empty_buttons=0;let empty_links=0;
 for(i in range(0,images.len())){if(!images.at(i).has_attr("alt")){missing_alt=missing_alt+1;}}
@@ -117,20 +117,20 @@ let links=d.select("a");for(i in range(0,links.len())){let n=links.at(i);if(str_
 assert_close(float(missing_alt),1.0,0.000001);assert_close(float(unlabeled),1.0,0.000001);
 assert_close(float(empty_buttons),1.0,0.000001);assert_close(float(empty_links),1.0,0.000001);
 file_write("data/web_accessibility_scan.csv","metric,value\nmissing alt,"+str(missing_alt)+"\nunlabeled input,"+str(unlabeled)+"\nempty button,"+str(empty_buttons)+"\nempty link,"+str(empty_links)+"\n");
-end _dsl_
-run_program(p,"build/a11y-parser.dslb");
+end _lmcode_
+run_program(p,"a11y-parser");
 ''')
 
 add('web_metadata_extractor','Extract and inspect JSON-LD and OpenGraph fields',r'''
 x=download(base,"/site/metadata.html","data/metadata.html",true);check(x.status==200,"metadata download");
-p=_dsl_ cli="lmhtml" install="github:lmctl-ai/lmhtml@latest";
+p=_lmcode_ cli="lmhtml" install="github:lmctl-ai/lmhtml@latest";
 let d=html.load("data/metadata.html");let blocks=d.select("script[type='application/ld+json']");let og=d.select("meta[property]");
 assert_close(float(blocks.len()),1.0,0.000001);
 file_write("data/jsonld.json",blocks.at(0).text());file_write("data/opengraph.csv","property,content\n");
 for(i in range(0,og.len())){file_append("data/opengraph.csv",og.at(i).attr("property")+","+og.at(i).attr("content")+"\n");}
 file_write("data/web_metadata_extractor.csv","metric,value\nJSON-LD blocks,"+str(blocks.len())+"\nOpenGraph fields,"+str(og.len())+"\n");
-end _dsl_
-run_program(p,"build/metadata-parser.dslb");
+end _lmcode_
+run_program(p,"metadata-parser");
 ld=read_json("data/jsonld.json");og=read_csv("data/opengraph.csv");
 check(ld["@type"]=="Article"&&ld.headline=="Fixture","JSON-LD values");
 check(og.len()==2&&og[0].content=="Fixture metadata"&&og[1].content=="/site/assets/logo.svg","OpenGraph values");
@@ -139,7 +139,7 @@ write_json("reports/extracted-metadata.json",{json_ld:ld,open_graph:og});
 
 add('web_form_inventory','Inventory form actions, methods and named controls',r'''
 x=download(base,"/site/forms.html","data/forms.html",true);check(x.status==200,"forms download");
-p=_dsl_ cli="lmhtml" install="github:lmctl-ai/lmhtml@latest";
+p=_lmcode_ cli="lmhtml" install="github:lmctl-ai/lmhtml@latest";
 let forms=html.load("data/forms.html").select("form");let gets=0;let posts=0;let total=0;let named=0;
 file_write("reports/form-controls.csv","method,action,tag,name,type\n");
 for(i in range(0,forms.len())){
@@ -152,8 +152,8 @@ for(i in range(0,forms.len())){
 assert_close(float(forms.len()),2.0,0.000001);assert_close(float(gets),1.0,0.000001);assert_close(float(posts),1.0,0.000001);
 assert_close(float(total),5.0,0.000001);assert_close(float(named),3.0,0.000001);
 file_write("data/web_form_inventory.csv","metric,value\nforms,"+str(forms.len())+"\nGET forms,"+str(gets)+"\nPOST forms,"+str(posts)+"\ncontrols,"+str(total)+"\nnamed controls,"+str(named)+"\n");
-end _dsl_
-run_program(p,"build/form-parser.dslb");
+end _lmcode_
+run_program(p,"form-parser");
 ''')
 
 add('web_robots_crawler','Respect robots exclusions and wait between allowed requests',r'''
@@ -166,11 +166,11 @@ for(line in read_lines("data/robots.txt")){
 }
 check(disallow.len()==1&&delay_ms==20,"fixture robots policy");sleep_ms(delay_ms);
 h=download(base,"/site/index.html","data/robots-index.html",true);check(h.status==200,"crawler seed");
-p=_dsl_ cli="lmhtml" install="github:lmctl-ai/lmhtml@latest";
+p=_lmcode_ cli="lmhtml" install="github:lmctl-ai/lmhtml@latest";
 let links=html.load("data/robots-index.html").links();file_write("data/robot-links.txt","");
 for(i in range(0,links.len())){file_append("data/robot-links.txt",links.at(i)+"\n");}
-end _dsl_
-run_program(p,"build/robots-parser.dslb");
+end _lmcode_
+run_program(p,"robots-parser");
 visited=[];skipped=0;ok=0;missing=0;previous=now();minimum_gap=100000;
 for(route in read_lines("data/robot-links.txt")){
  if(is_blank(route)){continue;}blocked=false;

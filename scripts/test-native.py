@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
-import argparse,json,os,subprocess,tempfile
+import argparse,json,os,subprocess,sys,tempfile
 from pathlib import Path
+sys.dont_write_bytecode=True
+sys.path.insert(0,str(Path(__file__).resolve().parent))
+from lmcode_capture import program
 p=argparse.ArgumentParser();p.add_argument('--host',required=True);a=p.parse_args();root=Path(__file__).resolve().parents[1];host=Path(a.host).resolve()
 env=dict(os.environ,LMCURL_LIVE='0');env['PATH']=str(host.parent)+os.pathsep+env['PATH']
 compiler=subprocess.check_output([str(root/'scripts/select-compiler.sh')],env=env,text=True,timeout=30).strip();passed=0
@@ -8,10 +11,7 @@ with tempfile.TemporaryDirectory(prefix='lmcurl-native-') as td:
  work=Path(td)
  def run(body,code=0,extra=None):
   global passed
-  env2=dict(env,**(extra or {}));source=work/'case.lms';out=work/'case.dslb'
-  source.write_text('p = _dsl_ cli="lmcurl";\n'+body+'\nend _dsl_\nsavedsl(p,'+json.dumps(str(out))+');\n')
-  r=subprocess.run([compiler,str(source)],cwd=work,env=env2,capture_output=True,text=True,timeout=30)
-  assert r.returncode==0,'compile failed: '+r.stderr
+  env2=dict(env,**(extra or {}));out=program(compiler,host,body,work/'case.bin',env2,work)
   r=subprocess.run([str(host),'--lmcode',str(out)],cwd=work,env=env2,capture_output=True,text=True,timeout=40)
   assert r.returncode==code,'host exit mismatch: '+str(r.returncode)+' '+r.stdout+' '+r.stderr
   passed+=1;return r
@@ -22,7 +22,7 @@ with tempfile.TemporaryDirectory(prefix='lmcurl-native-') as td:
  run('let m=curl.mock();let s=curl.session(m.url());let suite=curl.suite("negative");suite.test_request("wrong status",s.get("/status/404")).expect_status(200);suite.test_request("wrong body",s.get("/json")).expect_body("missing");let r=suite.report();assert_eq(r.failed(),2);r.junit("negative.xml");r.html("negative.html");file_write("negative.tap",r.tap());m.stop();')
  import xml.etree.ElementTree as ET
  x=ET.parse(work/'negative.xml').getroot();assert x.attrib['failures']=='2' and len(x.findall('testcase'))==2
- run('let m=curl.mock();let suite=curl.suite("exit");suite.test_request("bad",curl.session(m.url()).get("/status/500")).expect_status(200);suite.report().assert_all();m.stop();',1)
+ run('let m=curl.mock();let suite=curl.suite("exit");suite.test_request("bad",curl.session(m.url()).get("/status/500")).expect_status(200);suite.report().assert_all();m.stop();',4)
  run('let m=curl.mock();let s=curl.session(m.url());let suite=curl.suite("filter").filter("smoke");suite.test_request("yes",s.get("/json")).tag("smoke").expect_status(200);suite.test_request("no",s.get("/status/500")).tag("slow").expect_status(200);let r=suite.report();assert_eq(r.passed(),1);assert_eq(r.skipped(),1);m.stop();')
  (work/'cases.csv').write_text('id\na\nb\nc\n')
  run('let m=curl.mock();let s=curl.session(m.url());let suite=curl.suite("data").data_csv("cases.csv");suite.test_request("row",s.get("/echo?id={{id}}")).expect_json("$.args.id","{{id}}");assert_eq(suite.report().passed(),3);m.stop();')
@@ -36,7 +36,7 @@ with tempfile.TemporaryDirectory(prefix='lmcurl-native-') as td:
  run('for(i in range(0,33)){llm.mock("fixture").chat("ping").send();}',3)
  secret='fixture-'+('q7Z9'*10)
  r=run('let value=curl.env("LMCURL_TEST_SECRET");print(value);file_write("redacted.txt",value);file_append("redacted.txt",value);',extra={'LMCURL_TEST_SECRET':secret})
- assert secret not in r.stdout and secret not in (work/'redacted.txt').read_text()
+ assert secret not in r.stdout and secret not in (work/'redacted.txt').read_text(encoding='utf-8')
  run('let m=curl.mock();let r=curl.session(m.url()).get("/xml").send();assert_eq(r.xpath("string(/catalog/item[1])").value(),"alpha");m.stop();')
  run('let m=curl.mock();let r=curl.session(m.url()).get("/gzip").send();assert_eq(r.json("$.compressed").value(),"true");m.stop();')
  r=run('let s=curl.session("http://127.0.0.1:1");for(i in range(0,100000)){s.get("/").body(str_repeat("x",1000000));}',3,{'LMCURL_MAX_MEMORY_MB':'64'})
@@ -83,5 +83,5 @@ with tempfile.TemporaryDirectory(prefix='lmcurl-native-') as td:
  r=run('curl.session("http://127.0.0.1:1").get("/dead").timeout(500).allow_error(false).send();',3)
  assert 'HTTP transport failed' in r.stderr
  run('let m=curl.mock();let bad=curl.session("http://127.0.0.1:1").get("/dead").timeout(500).allow_error(true).send();assert_eq(bad.status(),0);assert_eq(bad.bytes(),0);assert_eq(str_len(bad.error())>0,true);let ok=curl.session(m.url()).get("/json").allow_error(true).send();assert_eq(ok.status(),200);assert_eq(ok.error(),"");file_write("receipt.txt",str(bad.status())+"|"+bad.error()+"|"+str(ok.status()));m.stop();')
- assert (work/'receipt.txt').read_text().startswith('0|') and (work/'receipt.txt').read_text().endswith('|200')
+ assert (work/'receipt.txt').read_text(encoding='utf-8').startswith('0|') and (work/'receipt.txt').read_text(encoding='utf-8').endswith('|200')
 print('PASS native HTTP/framework/LLM safety: '+str(passed)+' cases')

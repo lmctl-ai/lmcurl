@@ -63,28 +63,28 @@ for i,row in enumerate(S):
         S[i]=(row[0],row[1],body,*row[3:])
 for name,title,body,metrics,pre,plot in S:
     code='mkdir("data"); mkdir("images"); mkdir("reports"); mkdir("build/examples"); mkdir("docs/images");\n'+pre+'\n'
-    code+='p = _dsl_ cli="lmcurl" install="github:lmctl-ai/lmcurl@latest";\nlet m=curl.mock();\nlet s=curl.session(m.url());\n'+body+'\n'
+    code+='p = _lmcode_ cli="lmcurl" install="github:lmctl-ai/lmcurl@latest";\nlet m=curl.mock();\nlet s=curl.session(m.url());\n'+body+'\n'
     if name=='llm_matrix':
         code+='let heat="x,y,pass\\n";\nfor(i in range(0,matrix.len())){let a=0;let b=0;if(matrix.at(i).contains("pong")){a=1;}if(matrix.at(i).json_valid()){b=1;}heat=heat+"0,"+str(i)+","+str(a)+"\\n1,"+str(i)+","+str(b)+"\\n";}\nfile_write("data/model_heatmap.csv",heat);\n'
     code+='let csv="metric,value\\n";\n'
     for label,expr in metrics:code+='csv=csv+'+json.dumps(label+',')+'+str('+expr+')+"\\n";\n'
-    code+='file_write("data/'+name+'.csv",csv);\nm.stop();\nend _dsl_\n'
-    code+='savedsl(p,"build/examples/'+name+'.dslb");\nr = system ${dsl_cli(p)} --lmcode build/examples/'+name+'.dslb;\nif(r.code != 0){println(r.stdout);println(r.stderr);}\nassert(r.code==0);\n'
-    code+='plot = _dsl_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";\nplot.png("images/'+name+'.png",900,560);\n'
+    code+='file_write("data/'+name+'.csv",csv);\nm.stop();\nend _lmcode_\n'
+    code+='r = run_lmcode(p);\nrequire(r.ok,json_stringify(r));\n'
+    code+='plot = _lmcode_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";\nplot.png("images/'+name+'.png",900,560);\n'
     for cmd in ["set datafile separator ','",'set title '+json.dumps(title),'set yrange [0:*]; set offsets 0,0,graph 0.12,0; set grid y; unset key; set style fill solid 0.85; set boxwidth 0.65',"set xtics rotate by -15 font ',10'",'set ylabel '+json.dumps('observed value'),"plot 'data/"+name+".csv' every ::1 using 0:2:xtic(1) with boxes lc rgb '#0969da', '' every ::1 using 0:2:(sprintf('%.3g',$2)) with labels offset 0,0.8"]:code+='plot.cmd('+json.dumps(cmd)+');\n'
-    code+='plot.close();\nend _dsl_\nsavedsl(plot,"build/examples/'+name+'-plot.dslb");\nr = system ${dsl_cli(plot)} --lmcode build/examples/'+name+'-plot.dslb;\nassert(r.code==0);\nassert(copy_file("images/'+name+'.png","docs/images/'+name+'.png"));\nprintln("images/'+name+'.png");\n'
+    code+='plot.close();\nend _lmcode_\nr = run_lmcode(plot);\nrequire(r.ok,json_stringify(r));\nassert(copy_file("images/'+name+'.png","docs/images/'+name+'.png"));\nprintln("images/'+name+'.png");\n'
     (root/'examples'/f'{name}.lms').write_text(code)
 (root/'examples/catalog.json').write_text(json.dumps([{'name':n,'title':t,'script':f'examples/{n}.lms','image':f'docs/images/{n}.png'} for n,t,*_ in S],indent=2)+'\n')
 print('generated',len(S),'self-contained stories')
 
 p=root/'examples/llm_matrix.lms'
-s=p.read_text();a=s.index('plot.cmd(');b=s.index('plot.close();',a)
+s=p.read_text(encoding='utf-8');a=s.index('plot.cmd(');b=s.index('plot.close();',a)
 commands=["set datafile separator ','", "set title 'Prompt contract matrix (offline fixtures)'", "set xrange [-0.5:1.5]; set yrange [-0.5:2.5]; unset key", "set xtics ('contains pong' 0, 'valid JSON' 1); set ytics ('fixture a' 0, 'fixture b' 1, 'fixture c' 2)", "set palette defined (0 '#cf222e', 1 '#1a7f37'); set cbrange [0:1]; set cbtics ('FAIL' 0, 'PASS' 1)", "plot 'data/model_heatmap.csv' every ::1 using 1:2:3 with image, '' every ::1 using 1:2:(sprintf('%d',$3)) with labels tc rgb '#ffffff' font ',16'"]
 s=s[:a]+''.join('plot.cmd('+json.dumps(c)+');\n' for c in commands)+s[b:];p.write_text(s)
 # The login story also documents the verified request sequence as a flow diagram.
 p=root/'examples/login_session.lms'
-s=p.read_text();s=s[:s.index('plot = _dsl_')]
-s+='''draw = _dsl_ cli="lmdraw" install="github:lmctl-ai/lmdraw@latest";
+s=p.read_text(encoding='utf-8');s=s[:s.index('plot = _lmcode_')]
+s+='''draw = _lmcode_ cli="lmdraw" install="github:lmctl-ai/lmdraw@latest";
 scene.canvas(900,560,"#0d1726");
 scene.text(48.0,58.0,26.0,"Login, capture, then protected request","#edf5ff");
 scene.text(48.0,91.0,15.0,"Two real mock-server requests; assertions must pass before rendering","#a9bdd5");
@@ -105,10 +105,9 @@ let e2=scene.line(675.0,272.0,675.0,344.0,"#79c0ff",3.0);e2.set_attr("marker-end
 let e3=scene.line(507.0,415.0,395.0,415.0,"#79c0ff",3.0);e3.set_attr("marker-end","arrow");
 scene.text(48.0,520.0,14.0,"Fixture secrets are redacted from exported artifacts. No cloud credentials required.","#a9bdd5");
 scene.render_png("images/login_session.png",900,560,1);
-end _dsl_
-savedsl(draw,"build/examples/login_session-draw.dslb");
-r = system ${dsl_cli(draw)} --lmcode build/examples/login_session-draw.dslb;
-assert(r.code==0);
+end _lmcode_
+r = run_lmcode(draw);
+require(r.ok,json_stringify(r));
 assert(copy_file("images/login_session.png","docs/images/login_session.png"));
 println("images/login_session.png");
 '''

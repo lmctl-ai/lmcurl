@@ -4,11 +4,15 @@
 import os
 import socket
 import subprocess
+import sys
 import tempfile
 import time
 import urllib.request
 from pathlib import Path
 
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from lmcode_capture import program
 
 ROOT = Path(__file__).resolve().parents[1]
 HOST = Path(os.environ.get("LMCURL_HOST", ROOT / "build-clean/lmcurl")).resolve()
@@ -21,16 +25,7 @@ compiler = subprocess.check_output(
 
 
 def compile_program(source: str, directory: Path) -> Path:
-    script = directory / "case.lms"
-    bytecode = directory / "case.dslb"
-    script.write_text(
-        'p = _dsl_ cli="lmcurl";\n' + source + "\nend _dsl_\n" + f'savedsl(p,"{bytecode}");\n'
-    )
-    result = subprocess.run(
-        [compiler, str(script)], cwd=directory, env=env, capture_output=True, text=True, timeout=30
-    )
-    assert result.returncode == 0, result.stderr
-    return bytecode
+    return program(compiler, HOST, source, directory / "case.bin", env, directory)
 
 
 def run_host(bytecode: Path, timeout: float = 5.0) -> subprocess.CompletedProcess[str]:
@@ -48,7 +43,7 @@ def wait_ready(path: Path) -> str:
     deadline = time.monotonic() + 3
     while time.monotonic() < deadline:
         if path.exists():
-            value = path.read_text().strip()
+            value = path.read_text(encoding='utf-8').strip()
             if value:
                 return value
         time.sleep(0.01)

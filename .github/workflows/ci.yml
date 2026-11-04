@@ -69,7 +69,7 @@ jobs:
           node-version: 24
       - name: Install pinned lmscript compiler
         if: env.ONLY_OK == 'true'
-        run: timeout 180 npm install -g @lmctl-ai/lmctl@0.2.420
+        run: timeout 180 npm install -g @lmctl-ai/lmctl@0.2.460
       - name: Build and test
         if: env.ONLY_OK == 'true'
         env:

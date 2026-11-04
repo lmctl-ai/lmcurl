@@ -18,7 +18,7 @@ Download with upstream libcurl, parse with lmhtml, and turn asserted results int
 | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_content_diff.lms` | `lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_login_form.lms` |
 
 ```sh
-npm install -g @lmctl-ai/lmctl@0.2.420
+npm install -g @lmctl-ai/lmctl@0.2.460
 lmctl https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/examples/web_site_mirror.lms
 ```
 
@@ -129,10 +129,10 @@ Linux x64 and ARM64 are full native hosts requiring glibc >=2.35; application li
 bash scripts/sync-deps.sh
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel 2
-BUILD_DIR=build LMCURL_TEST_NETWORK=1 bash test.sh
+BUILD_DIR=build bash test.sh
 ```
 
-The local gate checks pins, exact schema/signatures/notices, dynamic glibc linkage, native safety regressions, parser integration, mock lifecycle and memory limits. With renderers available it executes all 48 stories and validates their images and new cost ledgers; otherwise it skips rendering loudly and checks committed images. `scripts/test-autorun.py --only-new` verifies the 16 new public URLs with a fresh cache and all four hosts removed from PATH.
+The local gate checks pins, exact schema/signatures/notices, dynamic glibc linkage, native safety regressions, parser integration, mock lifecycle and memory limits. With compatible lmplot, lmhtml and lmdraw already on PATH it executes all 48 stories and validates their images and new cost ledgers; otherwise it skips rendering loudly and checks committed images. `scripts/test-autorun.py --only-new` verifies the 16 new public URLs with a fresh cache and all four hosts removed from PATH.
 
 [Releases and SHA256SUMS](https://github.com/lmctl-ai/lmcurl/releases) · [Independent review](docs/REVIEW.md) · [Durable memory](durable-memory/index.md) · [Third-party notices](THIRD_PARTY_NOTICES) · [MIT license](LICENSE).
 

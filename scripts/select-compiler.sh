@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Select by emitted bytecode capability, not CLI version or schema support alone.
+# Select by what the compiler can do, not its version: implicit std and run_lmcode (checked, never executed).
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/lmcurl-compiler-XXXXXX")"
@@ -13,16 +13,11 @@ printf '%s\n' '{"dsl.schema":2,"name":"compiler_probe","types":{},"functions":{}
 python3 - "$(native "$WORK/probe.schema.json")" "$(native "$WORK")" <<'PY'
 import json,pathlib,sys
 work=pathlib.Path(sys.argv[2])
-(work/'probe.lms').write_text('p = _dsl_ schema='+json.dumps(sys.argv[1])+';\nlet n = str_len("implicit std");\nend _dsl_\nsavedsl(p, '+json.dumps(str(work/'probe.dslb'))+');\n')
+(work/'probe.lms').write_text('p = _lmcode_ schema='+json.dumps(sys.argv[1])+';\nlet n = str_len("implicit std");\nend _lmcode_\nr = run_lmcode(p, {command: ["probe", "--lmcode", "$DSLFILE"]});\n')
 PY
 if [ -n "$candidate" ] &&
    "$candidate" --lmcode-signatures "$WORK/probe.schema.json" > /dev/null 2>&1 &&
-   "$candidate" "$WORK/probe.lms" "$WORK/probe.dslb" > /dev/null 2>&1 &&
-   python3 - "$(native "$WORK/probe.dslb")" <<'PY'
-import pathlib,sys
-p=pathlib.Path(sys.argv[1])
-sys.exit(0 if p.is_file() and p.read_bytes()[:6] == b'DSLB\x00\x06' else 1)
-PY
+   "$candidate" --check "$WORK/probe.lms" > /dev/null 2>&1
 then
   printf '%s\n' "$candidate"
 else
@@ -30,9 +25,9 @@ else
     echo "--- compiler probe diagnostics (candidate=$candidate)" >&2
     cat "$WORK/probe.lms" >&2 || true
     [ -n "$candidate" ] && "$candidate" --lmcode-signatures "$WORK/probe.schema.json" 2>&1 | head -3 >&2
-    [ -n "$candidate" ] && "$candidate" "$WORK/probe.lms" "$WORK/probe.dslb" 2>&1 | head -10 >&2
+    [ -n "$candidate" ] && "$candidate" --check "$WORK/probe.lms" 2>&1 | head -10 >&2
     ls -la "$WORK" >&2
   fi
-  echo "error: no implicit-std lmcode v6 compiler found; build mono main with the host-flag cutover so lmscript is on PATH, or set LMSCRIPT_BIN" >&2
+  echo "error: no run_lmcode compiler found; set LMSCRIPT_BIN to a private @lmctl-ai/lmctl@0.2.460 installation" >&2
   exit 2
 fi

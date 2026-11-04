@@ -3,7 +3,7 @@
 import argparse,hashlib,json,os,re,shutil,subprocess,tempfile,time
 from pathlib import Path
 root=Path(__file__).resolve().parents[1]
-parser=argparse.ArgumentParser();parser.add_argument('--only-new',action='store_true');parser.add_argument('--version',default=re.search(r'project\(lmcurl VERSION ([0-9.]+)',(root/'CMakeLists.txt').read_text()).group(1));args=parser.parse_args()
+parser=argparse.ArgumentParser();parser.add_argument('--only-new',action='store_true');parser.add_argument('--version',default=re.search(r'project\(lmcurl VERSION ([0-9.]+)',(root/'CMakeLists.txt').read_text(encoding='utf-8')).group(1));args=parser.parse_args()
 env=dict(os.environ,LMCURL_LIVE='0')
 if not env.get('GITHUB_TOKEN'):
  env['GITHUB_TOKEN']=subprocess.check_output(['gh','auth','token'],text=True,timeout=30).strip()
@@ -14,7 +14,7 @@ assert all(shutil.which(name,path=env['PATH']) is None for name in ('lmcurl','lm
 rows=[]
 with tempfile.TemporaryDirectory(prefix='lmcurl-autorun-') as td:
  base=Path(td);cache=base/'tool-cache';env['LMSCRIPT_TOOL_CACHE']=str(cache);env['LMCTL_HOME']=str(base/'lmctl')
- for row in json.loads((root/'examples/catalog.json').read_text()):
+ for row in json.loads((root/'examples/catalog.json').read_text(encoding='utf-8')):
   if args.only_new and not row['name'].startswith('web_'):continue
   work=base/row['name'];work.mkdir();url='https://raw.githubusercontent.com/lmctl-ai/lmcurl/main/'+row['script'];start=time.monotonic()
   result=subprocess.run([cli,'autorun',url],cwd=work,env=env,capture_output=True,text=True,timeout=300)
@@ -23,8 +23,8 @@ with tempfile.TemporaryDirectory(prefix='lmcurl-autorun-') as td:
   image=work/'images'/(row['name']+'.png');data=image.read_bytes();assert data[:8]==b'\x89PNG\r\n\x1a\n' and len(data)<=307200
   cost={}
   if row['name'].startswith('web_'):
-   ledger=json.loads((work/'reports'/(row['name']+'-cost.json')).read_text())
-   events=[json.loads(line) for line in (work/'data/web-requests.jsonl').read_text().splitlines() if line]
+   ledger=json.loads((work/'reports'/(row['name']+'-cost.json')).read_text(encoding='utf-8'))
+   events=[json.loads(line) for line in (work/'data/web-requests.jsonl').read_text(encoding='utf-8').splitlines() if line]
    assert ledger['estimated_cost_usd']==0 and len(events)==ledger['requests'] and events
    assert all(v['route'].startswith('/site/') and v['estimated_cost_usd']==0 for v in events)
    if row['name']=='web_robots_crawler':assert all(not v['route'].startswith('/site/private/') for v in events)

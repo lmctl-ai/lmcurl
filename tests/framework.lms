@@ -1,5 +1,5 @@
 # Framework regression script. The mock endpoint is provided by Curl.mock().
-p = _dsl_ cli="lmcurl" install="github:lmctl-ai/lmcurl@latest";
+p = _lmcode_ cli="lmcurl" install="github:lmctl-ai/lmcurl@latest";
 let mock = curl.mock();
 let s = curl.session(mock.url());
 let response = s.get("/json").send();
@@ -16,7 +16,6 @@ report.junit("reports/framework.junit.xml");
 report.html("reports/framework.html");
 report.json();
 mock.stop();
-end _dsl_
-savedsl(p, "build/tests/framework.dslb");
-r = system ${dsl_cli(p)} --lmcode build/tests/framework.dslb;
-assert(r.code == 0);
+end _lmcode_
+r = run_lmcode(p);
+require(r.ok,json_stringify(r));

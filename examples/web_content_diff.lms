@@ -8,11 +8,9 @@ fn check(ok, message) {
   if (!ok) { println(message); }
   assert(ok);
 }
-fn run_program(program, path) {
-  savedsl(program, path);
-  r = system ${dsl_cli(program)} --lmcode ${path};
-  if (r.code != 0) { println(r.stderr); }
-  check(r.code == 0, "native stage failed: " + path);
+fn run_program(program, label) {
+  r = run_lmcode(program);
+  check(r.ok, "native stage failed: " + label + ": " + json_stringify(r));
   return r;
 }
 fn record_request(route, status, bytes) {
@@ -23,25 +21,25 @@ fn download(base, route, out, follow) {
   check(starts_with(base, "http://127.0.0.1:"), "expected loopback mock URL");
   if (starts_with(route,base+"/site/")) { route=replace(route,base,""); }
   check(starts_with(route, "/site/") && !contains(route, ".."), "fixture route outside scope");
-  p = _dsl_ cli="lmcurl" install="github:lmctl-ai/lmcurl@latest";
+  p = _lmcode_ cli="lmcurl" install="github:lmctl-ai/lmcurl@latest";
 let r=curl.session(${base}).get(${route}).proxy("").follow(${follow}).timeout(5000).limit(1048576).send();
 r.save(${out});
 file_write(${out + ".status"},str(r.status()));
 file_write(${out + ".bytes"},str(r.bytes()));
 file_write(${out + ".location"},r.header("location"));
-end _dsl_
-  run_program(p, out + ".dslb");
+end _lmcode_
+  run_program(p, out);
   status = json_parse(read_file(out + ".status"));
   bytes = json_parse(read_file(out + ".bytes"));
   record_request(route, status, bytes);
   return {status: status, bytes: bytes, path: out, location: read_file(out + ".location")};
 }
 fn serve_site() {
-  p = _dsl_ cli="lmcurl" install="github:lmctl-ai/lmcurl@latest";
+  p = _lmcode_ cli="lmcurl" install="github:lmctl-ai/lmcurl@latest";
 let site=curl.mock();
 site.serve("build/web-ready.txt","build/web-stop.txt",60000);
-end _dsl_
-  run_program(p,"build/web-server.dslb");
+end _lmcode_
+  run_program(p,"web-server");
   return true;
 }
 fn wait_and_run() {
@@ -61,7 +59,7 @@ a=download(base,"/site/changes.html","data/before.html",true);
 b=download(base,"/site/changes.html","data/after.html",true);
 c=download(base,"/site/changes.html","data/unchanged.html",true);
 check(a.status==200&&b.status==200&&c.status==200,"content crawls");
-p=_dsl_ cli="lmhtml" install="github:lmctl-ai/lmhtml@latest";
+p=_lmcode_ cli="lmhtml" install="github:lmctl-ai/lmhtml@latest";
 let before=html.load("data/before.html");let after=html.load("data/after.html");let stable=html.load("data/unchanged.html");
 let changed=html.diff(before,after);let unchanged=html.diff(after,stable);
 if(changed<=0){report.add("assertion","diff",0,"changed content not detected");report.fail_if_any();}
@@ -69,27 +67,16 @@ assert_close(float(unchanged),0.0,0.000001);
 file_write("data/diff-before.txt",before.select("p").at(0).text());file_write("data/diff-after.txt",after.select("p").at(0).text());
 file_write("data/diff-count.txt",str(changed));
 file_write("data/web_content_diff.csv","metric,value\nchanged crawl,"+str(changed)+"\nstable crawl,"+str(unchanged)+"\n");
-end _dsl_
-run_program(p,"build/diff-parser.dslb");
+end _lmcode_
+run_program(p,"diff-parser");
 
 }
-# Older published lmhtml binaries predate the implicit standard file catalog.
-html_probe=_dsl_ cli="lmhtml" install="github:lmctl-ai/lmhtml@latest";
-let doc=html.parse("<html><body>compatibility probe</body></html>");
-end _dsl_
-html_version=system ${dsl_cli(html_probe)} --version;
-check(html_version.code==0,"cannot query lmhtml version");
-version_words=split(trim(html_version.stdout)," ");
-check(version_words.len()==2&&version_words[0]=="lmhtml","unexpected lmhtml version output");
-version_parts=split(version_words[1],".");check(version_parts.len()==3,"unexpected lmhtml version number");
-major=json_parse(version_parts[0]);minor=json_parse(version_parts[1]);patch=json_parse(version_parts[2]);
-check(major>0||minor>7||(minor==7&&patch>=4),"lmhtml >=0.7.4 is required; upgrade or remove an older PATH installation");
 parallel([serve_site(), wait_and_run()]);
 events=read_lines("data/web-requests.jsonl"); request_count=0;
 for (line in events) { if (!is_blank(line)) { request_count=request_count+1; } }
 write_json("reports/web_content_diff-cost.json",{mode:"offline-loopback",currency:"USD",price_table:{loopback_request_usd:0},example_cap_usd:0.02,hard_run_cap_usd:0.25,requests:request_count,estimated_cost_usd:0});
 println("estimated cost: $0.0000 (loopback fixtures only)");
-draw = _dsl_ cli="lmdraw" install="github:lmctl-ai/lmdraw@latest";
+draw = _lmcode_ cli="lmdraw" install="github:lmctl-ai/lmdraw@latest";
 
 scene.canvas(900,560,"#0d1726");
 scene.text(50.0,65.0,28.0,"Two crawls, one real content change","#edf5ff");
@@ -105,7 +92,7 @@ scene.text(65.0,450.0,20.0,"Structural differences: "+file_read("data/diff-count
 scene.text(65.0,492.0,17.0,"A third fetch matches the second: zero new differences.","#a9bdd5");
 scene.render_png("images/web_content_diff.png",900,560,1);
 
-end _dsl_
-run_program(draw,"build/web_content_diff-draw.dslb");
+end _lmcode_
+run_program(draw,"web_content_diff-draw");
 assert(copy_file("images/web_content_diff.png","docs/images/web_content_diff.png"));
 println("images/web_content_diff.png");

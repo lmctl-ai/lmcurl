@@ -1,6 +1,6 @@
 mkdir("data"); mkdir("images"); mkdir("reports"); mkdir("build/examples"); mkdir("docs/images");
 
-p = _dsl_ cli="lmcurl" install="github:lmctl-ai/lmcurl@latest";
+p = _lmcode_ cli="lmcurl" install="github:lmctl-ai/lmcurl@latest";
 let m=curl.mock();
 let s=curl.session(m.url());
 let anon=s.get("/auth/basic").send();let auth=s.get("/auth/basic").basic("demo","demo").send();
@@ -10,12 +10,10 @@ csv=csv+"anonymous status,"+str(anon.status())+"\n";
 csv=csv+"authenticated status,"+str(auth.status())+"\n";
 file_write("data/auth_boundary.csv",csv);
 m.stop();
-end _dsl_
-savedsl(p,"build/examples/auth_boundary.dslb");
-r = system ${dsl_cli(p)} --lmcode build/examples/auth_boundary.dslb;
-if(r.code != 0){println(r.stdout);println(r.stderr);}
-assert(r.code==0);
-plot = _dsl_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+end _lmcode_
+r = run_lmcode(p);
+require(r.ok,json_stringify(r));
+plot = _lmcode_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
 plot.png("images/auth_boundary.png",900,560);
 plot.cmd("set datafile separator ','");
 plot.cmd("set title \"Anonymous and authenticated access\"");
@@ -24,9 +22,8 @@ plot.cmd("set xtics rotate by -15 font ',10'");
 plot.cmd("set ylabel \"observed value\"");
 plot.cmd("plot 'data/auth_boundary.csv' every ::1 using 0:2:xtic(1) with boxes lc rgb '#0969da', '' every ::1 using 0:2:(sprintf('%.3g',$2)) with labels offset 0,0.8");
 plot.close();
-end _dsl_
-savedsl(plot,"build/examples/auth_boundary-plot.dslb");
-r = system ${dsl_cli(plot)} --lmcode build/examples/auth_boundary-plot.dslb;
-assert(r.code==0);
+end _lmcode_
+r = run_lmcode(plot);
+require(r.ok,json_stringify(r));
 assert(copy_file("images/auth_boundary.png","docs/images/auth_boundary.png"));
 println("images/auth_boundary.png");

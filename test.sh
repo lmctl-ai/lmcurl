@@ -7,11 +7,11 @@ case "$(uname -s)" in Darwin|MINGW*|MSYS*|CYGWIN*)
  cmake -S . -B "$BUILD_DIR" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER="${CC:-gcc}" -DCMAKE_CXX_COMPILER="${CXX:-g++}" >/dev/null
  cmake --build "$BUILD_DIR" --parallel 2 >/dev/null
  exe="$BUILD_DIR/lmcurl"; [[ -f "$exe.exe" ]] && exe="$exe.exe"
- [[ "$("$exe" --version)" == 'lmcurl 0.1.2' ]]
+ [[ "$("$exe" --version)" == 'lmcurl 0.1.3' ]]
  "$exe" --help | grep -q 'stub'
  python3 tests/check-host-flags.py schema/lmcurl.dsl.json "$exe"
  "$exe" --lmcode-schema --json | python3 -c 'import json,sys;assert json.load(sys.stdin)["name"]=="lmcurl"'
- set +e; "$exe" --lmcode not-present.dslb 2>"$BUILD_DIR/stub.err"; status=$?; set -e
+ set +e; "$exe" --lmcode not-present.bin 2>"$BUILD_DIR/stub.err"; status=$?; set -e
  [[ "$status" == 3 ]]; grep -q 'not supported' "$BUILD_DIR/stub.err"
  echo 'PASS: stub metadata and explicit unsupported execution (4 checks)'; exit 0;;
 esac
@@ -31,34 +31,43 @@ export PATH="$(dirname "$exe"):$PATH"
 python3 tests/check-host-flags.py schema/lmcurl.dsl.json "$exe"
 python3 tests/test-stub-flags.py
 compiler="$(scripts/select-compiler.sh)"
-[[ "$("$exe" --version)" == 'lmcurl 0.1.2' ]]
+[[ "$("$exe" --version)" == 'lmcurl 0.1.3' ]]
 "$exe" --notices >"$BUILD_DIR/notices.check"; cmp THIRD_PARTY_NOTICES "$BUILD_DIR/notices.check"
 python3 scripts/gen-schema.py "$exe" >"$BUILD_DIR/schema.check"; cmp schema/lmcurl.dsl.json "$BUILD_DIR/schema.check"
 "$exe" --lmcode-schema --json >"$BUILD_DIR/embedded.check"; cmp schema/lmcurl.dsl.json "$BUILD_DIR/embedded.check"
 diff -u <("$compiler" --lmcode-signatures schema/lmcurl.dsl.json) <("$exe" --lmcode-signatures)
 python3 scripts/check-linux-linkage.py "$exe"
 mkdir -p build/tests
-for source in tests/*.lms; do timeout 60 "$compiler" "$source"; done
+# Another host binds only when a compatible one is already on PATH: a release that still speaks the
+# retired protocol is not usable, and installing one here would fetch exactly that.
+has_host() { command -v "$1" >/dev/null 2>&1 && "$1" --lmcode-schema --json >/dev/null 2>&1; }
+for source in tests/*.lms; do
+ case "$source" in tests/web-mock.lms) has_host lmhtml || { echo "SKIP LOUDLY: $source needs a compatible lmhtml on PATH"; continue; };; esac
+ timeout 60 "$compiler" "$source"
+done
 timeout 60 scripts/test-memory-budget.sh
 LMCURL_HOST="$exe" timeout 60 python3 scripts/test-mock-serve.py
 python3 scripts/test-native.py --host "$exe"
-if [[ "${LMCURL_TEST_NETWORK:-0}" == 1 ]] || command -v lmplot >/dev/null; then
+python3 tests/check-protocol.py "$exe" "$compiler"
+if has_host lmplot && has_host lmhtml && has_host lmdraw; then
  timeout 1500 python3 scripts/test-examples.py --host "$exe" --render
 else
  python3 scripts/test-examples.py --host "$exe"
- echo 'SKIP LOUDLY: example execution/images not regenerated; set LMCURL_TEST_NETWORK=1 or put lmplot on PATH'
+ echo 'SKIP LOUDLY: example execution/images not regenerated; put compatible lmplot, lmhtml and lmdraw on PATH'
 fi
-# Default 4096 MiB budget checked separately from the small native regression.
-cat >"$BUILD_DIR/default-budget.lms" <<'LMS'
-p = _dsl_ cli="lmcurl";
+# Default 4096 MiB budget checked separately from the small native regression. The program comes
+# from a dry invocation (nothing runs), so the limit below applies to the host and not to node.
+cat >"$BUILD_DIR/default-budget.lms" <<LMS
+p = _lmcode_ schema="$PWD/schema/lmcurl.dsl.json";
 let s=curl.session("http://127.0.0.1:1");
 for(i in range(0,100000)){s.get("/").body(str_repeat("x",1000000));}
-end _dsl_
-savedsl(p,"build/tests/default-budget.dslb");
+end _lmcode_
+r = run_lmcode(p, {command: ["python3", "scripts/record-program.py", "lmcurl", "build/tests/default-budget.bin", "--lmcode", "\$DSLFILE"]});
+require(r.ok, json_stringify(r));
 LMS
-"$compiler" "$BUILD_DIR/default-budget.lms"
+"$compiler" --dry-run "$BUILD_DIR/default-budget.lms" >/dev/null
 set +e
-(ulimit -v 6291456; timeout 180 "$exe" --lmcode build/tests/default-budget.dslb) >"$BUILD_DIR/budget.out" 2>"$BUILD_DIR/budget.err"; status=$?
+(ulimit -v 6291456; timeout 180 "$exe" --lmcode build/tests/default-budget.bin) >"$BUILD_DIR/budget.out" 2>"$BUILD_DIR/budget.err"; status=$?
 set -e
 [[ "$status" == 3 ]]; grep -q 'memory budget exceeded' "$BUILD_DIR/budget.err"; grep -q 'LMCURL_MAX_MEMORY_MB' "$BUILD_DIR/budget.err"
 python3 scripts/check-secrets.py --artifacts

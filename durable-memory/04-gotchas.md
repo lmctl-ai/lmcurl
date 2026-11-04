@@ -1,6 +1,6 @@
 # Operational gotchas
 
-Schema changes alter bytecode compatibility and require regenerating signatures and references. `lmctl autorun` must execute saved bytecode and write images under the current directory; examples therefore contain their own `savedsl`, `system ${dsl_cli(...)}` and renderer blocks.
+Schema changes alter bytecode compatibility and require regenerating signatures and references. `lmctl autorun` must execute the program and write images under the current directory; examples therefore contain their own `run_lmcode` calls and renderer blocks.
 
 The live LLM path is opt-in and should use tiny prompts/free or local models. Cost is reserved before transmission, settled from provider usage when available, and never logs Authorization headers or key-looking values. A failed provider call may still consume a reserved estimate.
 
@@ -10,7 +10,7 @@ curl runs configure-time link probes against ZLIB::ZLIB. Keep zlib as a separate
 
 OpenSSL must receive `--libdir=lib64` explicitly. Its upstream default is lib64 on Linux x64 and lib on ARM64; the imported archive paths intentionally use the same layout on both.
 
-New examples need lmcurl >=0.1.1 for Mock.serve. Use opaque `_dsl_` values with savedsl/system; strings are not executable DSL. Variables do not cross native processes: parser exports must be read back by outer lmscript. `${value}` already emits a typed DSL literal and must not be wrapped in extra quotes.
+New examples need lmcurl >=0.1.1 for Mock.serve. Use opaque `_lmcode_` values with run_lmcode; strings are not executable programs. run_lmcode returns the envelope, so check r.ok; host output is not in r, so data crosses through files. Variables do not cross native processes: parser exports must be read back by outer lmscript. `${value}` already emits a typed DSL literal and must not be wrapped in extra quotes.
 
 lmhtml v0.7.4 is an HTML5 parser. The XML recipes select unprefixed elements; RSS uses permalink GUIDs because HTML treats link as a void element. Atom URLs come from link href. Table-to-CSV and field handoff are example glue, not new lmhtml APIs. Robots handling intentionally covers the fixture subset (wildcard agent, Disallow prefixes and Crawl-delay), not complete RFC policy.
 

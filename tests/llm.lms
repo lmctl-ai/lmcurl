@@ -1,4 +1,4 @@
-p = _dsl_ cli="lmcurl" install="github:lmctl-ai/lmcurl@latest";
+p = _lmcode_ cli="lmcurl" install="github:lmctl-ai/lmcurl@latest";
 let provider = llm.mock("mock-model");
 let network = curl.mock();
 let local = llm.provider("mock", network.url(), "fixture-model");
@@ -22,7 +22,6 @@ assert_eq(matrix.len(), 2);
 let recorded = provider.chat("ping").cassette("build/tests/llm-cassette.json").send();
 let replay = provider.chat("ping").replay("build/tests/llm-cassette.json").send();
 assert_eq(replay.text(), "pong");
-end _dsl_
-savedsl(p, "build/tests/llm.dslb");
-r = system ${dsl_cli(p)} --lmcode build/tests/llm.dslb;
-assert(r.code == 0);
+end _lmcode_
+r = run_lmcode(p);
+require(r.ok,json_stringify(r));

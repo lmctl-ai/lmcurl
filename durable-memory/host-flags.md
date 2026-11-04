@@ -4,12 +4,12 @@ Linux and the unsupported-platform stub accept only --lmcode, --lmcode-schema
 and --lmcode-signatures for the host protocol. Retired names are usage exit 2;
 stub execution under the new name stays explicit unsupported exit 3. Exact raw
 schema and signature artifacts are unchanged in meaning; SDK sync and metadata
-regeneration are performed through the owner scripts. DSLB and .dslb remain.
+regeneration are performed through the owner scripts. DSLB remains as the private program format; the compiler writes no .dslb files.
 
 Both original production entry points were observed failing the refusal controls.
 The normal gate includes the real Linux CLI and an actual compiled stub source
-with exact embedded resource bytes (no replacement parser). Current SDK 20325f7
-and source-compiler v6 capability probes agree. Existing generators regenerated
+with exact embedded resource bytes (no replacement parser). SDK and source-compiler
+capability probes agree (see 07-invocation-envelope.md). Existing generators regenerated
 32 normal and 16 web stories. Gallery PATH comes from explicit/private tools,
 not hard-coded shared checkouts.
 

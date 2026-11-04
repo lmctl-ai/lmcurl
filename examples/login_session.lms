@@ -1,6 +1,6 @@
 mkdir("data"); mkdir("images"); mkdir("reports"); mkdir("build/examples"); mkdir("docs/images");
 
-p = _dsl_ cli="lmcurl" install="github:lmctl-ai/lmcurl@latest";
+p = _lmcode_ cli="lmcurl" install="github:lmctl-ai/lmcurl@latest";
 let m=curl.mock();
 let s=curl.session(m.url());
 let suite=curl.suite("login capture");
@@ -12,12 +12,10 @@ csv=csv+"passed checks,"+str(report.passed())+"\n";
 csv=csv+"failed checks,"+str(report.failed())+"\n";
 file_write("data/login_session.csv",csv);
 m.stop();
-end _dsl_
-savedsl(p,"build/examples/login_session.dslb");
-r = system ${dsl_cli(p)} --lmcode build/examples/login_session.dslb;
-if(r.code != 0){println(r.stdout);println(r.stderr);}
-assert(r.code==0);
-draw = _dsl_ cli="lmdraw" install="github:lmctl-ai/lmdraw@latest";
+end _lmcode_
+r = run_lmcode(p);
+require(r.ok,json_stringify(r));
+draw = _lmcode_ cli="lmdraw" install="github:lmctl-ai/lmdraw@latest";
 scene.canvas(900,560,"#0d1726");
 scene.text(48.0,58.0,26.0,"Login, capture, then protected request","#edf5ff");
 scene.text(48.0,91.0,15.0,"Two real mock-server requests; assertions must pass before rendering","#a9bdd5");
@@ -38,9 +36,8 @@ let e2=scene.line(675.0,272.0,675.0,344.0,"#79c0ff",3.0);e2.set_attr("marker-end
 let e3=scene.line(507.0,415.0,395.0,415.0,"#79c0ff",3.0);e3.set_attr("marker-end","arrow");
 scene.text(48.0,520.0,14.0,"Fixture secrets are redacted from exported artifacts. No cloud credentials required.","#a9bdd5");
 scene.render_png("images/login_session.png",900,560,1);
-end _dsl_
-savedsl(draw,"build/examples/login_session-draw.dslb");
-r = system ${dsl_cli(draw)} --lmcode build/examples/login_session-draw.dslb;
-assert(r.code==0);
+end _lmcode_
+r = run_lmcode(draw);
+require(r.ok,json_stringify(r));
 assert(copy_file("images/login_session.png","docs/images/login_session.png"));
 println("images/login_session.png");
