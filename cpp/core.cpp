@@ -248,6 +248,17 @@ void method(dslvm::Registry &r, Runtime &rt, const char *type, const char *name,
     }
   });
 }
+// A failed assertion names both sides, so a failing script says what it saw. A string is clipped (a response body can be long)
+// and shown with its byte length; the host redacts secrets in every error it prints.
+static std::string clip_for_message(const std::string &text) {
+  constexpr std::size_t limit = 120;
+  std::string shown;
+  for (std::size_t i = 0; i < text.size() && i < limit; ++i) {
+    unsigned char c = static_cast<unsigned char>(text[i]);
+    shown += (c < 0x20 || c == 0x7f) ? '?' : static_cast<char>(c);
+  }
+  return "\"" + shown + (text.size() > limit ? "\"..." : "\"") + "(" + std::to_string(text.size()) + " bytes)";
+}
 void register_safe_std(dslvm::Registry &r, Runtime &rt) {
   for (const auto *name : {"print", "println"})
     r.function(name, {"string"}, "void", [&rt](Args &a) {
@@ -274,22 +285,22 @@ void register_safe_std(dslvm::Registry &r, Runtime &rt) {
   });
   r.function("assert_eq", {"int", "int"}, "void", [](Args &a) {
     if (a[0].i != a[1].i)
-      throw dslvm::Error("assert_eq(int) failed");
+      throw dslvm::Error("assert_eq(int) failed: left=" + std::to_string(a[0].i) + " right=" + std::to_string(a[1].i));
     return Value::none();
   });
   r.function("assert_eq", {"string", "string"}, "void", [](Args &a) {
     if (a[0].s != a[1].s)
-      throw dslvm::Error("assert_eq(string) failed");
+      throw dslvm::Error("assert_eq(string) failed: left=" + clip_for_message(a[0].s) + " right=" + clip_for_message(a[1].s));
     return Value::none();
   });
   r.function("assert_eq", {"bool", "bool"}, "void", [](Args &a) {
     if (a[0].b != a[1].b)
-      throw dslvm::Error("assert_eq(bool) failed");
+      throw dslvm::Error(std::string("assert_eq(bool) failed: left=") + (a[0].b ? "true" : "false") + " right=" + (a[1].b ? "true" : "false"));
     return Value::none();
   });
   r.function("assert_close", {"float", "float", "float"}, "void", [](Args &a) {
     if (!(std::fabs(a[0].f - a[1].f) <= a[2].f))
-      throw dslvm::Error("assert_close failed");
+      throw dslvm::Error("assert_close failed: left=" + std::to_string(a[0].f) + " right=" + std::to_string(a[1].f) + " tolerance=" + std::to_string(a[2].f));
     return Value::none();
   });
 }

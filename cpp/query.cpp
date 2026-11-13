@@ -63,7 +63,8 @@ Json select_json(const Json &root, const std::string &path, bool &found) {
         while (i < path.size() && std::isdigit(static_cast<unsigned char>(path[i])))
           ++i;
         if (i == start)
-          throw dslvm::Error("unsupported JSONPath index");
+          throw dslvm::Error(path[i] == '?' ? "unsupported JSONPath filter [?...]: use a name, ['name'], [N] or [*] and test the result with Query methods"
+                                            : "unsupported JSONPath index: expected a number, * or a quoted name");
         t.index = std::stoll(path.substr(start, i - start));
       }
       if (i >= path.size() || path[i++] != ']')

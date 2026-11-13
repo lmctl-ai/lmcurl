@@ -1,0 +1,42 @@
+# A failed assertion and an unsupported JSONPath name what they saw (the first versions said only "assert_eq(int) failed").
+let a = _lmcode_ cli="lmcurl";
+assert_eq(200, 201);
+end _lmcode_
+let ra = run_lmcode(a);
+require(!ra.ok && contains(ra.message, "assert_eq(int) failed: left=200 right=201"), json_stringify(ra));
+
+let b = _lmcode_ cli="lmcurl";
+assert_eq("<h1>a</h1>", "<h1>b</h1>");
+end _lmcode_
+let rb = run_lmcode(b);
+require(!rb.ok && contains(rb.message, "left=\"<h1>a</h1>\"(10 bytes) right=\"<h1>b</h1>\"(10 bytes)"), json_stringify(rb));
+
+let c = _lmcode_ cli="lmcurl";
+assert_eq(true, false);
+end _lmcode_
+let rc = run_lmcode(c);
+require(!rc.ok && contains(rc.message, "assert_eq(bool) failed: left=true right=false"), json_stringify(rc));
+
+let d = _lmcode_ cli="lmcurl";
+assert_close(1.0, 2.0, 0.5);
+end _lmcode_
+let rd = run_lmcode(d);
+require(!rd.ok && contains(rd.message, "assert_close failed: left=1.0") && contains(rd.message, "tolerance=0.5"), json_stringify(rd));
+
+# a long string is clipped to 120 bytes and still reports its full length
+let e = _lmcode_ cli="lmcurl";
+let long = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
+assert_eq(long, "y");
+end _lmcode_
+let re = run_lmcode(e);
+require(!re.ok && contains(re.message, "(500 bytes)") && contains(re.message, "\"...") && !contains(re.message, "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"), json_stringify(re));
+
+let f = _lmcode_ cli="lmcurl";
+let mock = curl.mock();
+let session = curl.session(mock.url());
+let response = session.get("/json").send();
+let v = response.json("$.ok[?name=='a']").nth(0).equals("a");
+end _lmcode_
+let rf = run_lmcode(f);
+require(!rf.ok && contains(rf.message, "unsupported JSONPath filter [?...]"), json_stringify(rf));
+println("PASS assertion and JSONPath messages name what they saw (6 checks)");
