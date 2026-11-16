@@ -10,8 +10,8 @@ RUN case "$(uname -m)" in x86_64) N=x64;; aarch64) N=arm64;; *) exit 1;; esac \
  && cd /tmp && curl -fsSLO https://nodejs.org/dist/latest-v24.x/SHASUMS256.txt \
  && F=$(grep "linux-$N.tar.xz" SHASUMS256.txt | awk '{print $2}') && curl -fsSLO "https://nodejs.org/dist/latest-v24.x/$F" \
  && grep " $F\$" SHASUMS256.txt | sha256sum --check --strict && tar -xJf "$F" -C /usr/local --strip-components=1 && rm -f "$F" SHASUMS256.txt
+# The tests use a newer Python than the image's system 3.6, and the arm64 image carries no ninja.
+ENV PATH=/opt/python/cp312-cp312/bin:$PATH HOME=/tmp
 RUN command -v ninja >/dev/null || python3 -m pip install --no-cache-dir ninja
 RUN npm install --global @lmctl-ai/lmctl@0.2.482
-# The tests use a newer Python than the image's system 3.6.
-ENV PATH=/opt/python/cp312-cp312/bin:$PATH HOME=/tmp
 WORKDIR /work/source
