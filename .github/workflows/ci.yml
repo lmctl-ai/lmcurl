@@ -44,13 +44,13 @@ jobs:
         if: env.ONLY_OK == 'true'
         with:
           persist-credentials: false
-      - name: Linux toolchain and pinned dependencies
+      - name: Build image (glibc 2.28 floor, Linux)
         if: runner.os == 'Linux' && env.ONLY_OK == 'true'
         run: |
-          timeout 180 sudo apt-get update -qq
-          timeout 180 sudo apt-get install -y -qq ninja-build perl
-          timeout 600 scripts/sync-deps.sh
-          timeout 60 scripts/sync-sdk.sh --verify
+          arch=x86_64; [ "$RUNNER_ARCH" = ARM64 ] && arch=aarch64
+          docker build -t lmcurl-oldglibc \
+            --build-arg "IMAGE=quay.io/pypa/manylinux_2_28_${arch}" \
+            -f packaging/oldglibc.Dockerfile packaging
       - name: CMake tools (macOS)
         if: runner.os == 'macOS' && env.ONLY_OK == 'true'
         run: brew install ninja coreutils
@@ -64,14 +64,22 @@ jobs:
           command -v g++ >/dev/null 2>&1 || exit 1
           command -v ninja >/dev/null 2>&1 || exit 1
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        if: env.ONLY_OK == 'true'
+        if: runner.os != 'Linux' && env.ONLY_OK == 'true'
         with:
           node-version: 24
       - name: Install pinned lmscript compiler
-        if: env.ONLY_OK == 'true'
+        if: runner.os != 'Linux' && env.ONLY_OK == 'true'
         run: timeout 180 npm install -g @lmctl-ai/lmctl@0.2.482
+      - name: Build and test (Linux, inside the old-glibc image)
+        if: runner.os == 'Linux' && env.ONLY_OK == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # The workspace is mounted at its host path so any recorded absolute paths stay valid.
+        run: |
+          timeout 1800 docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -e CI -e LMCURL_LIVE -e GITHUB_TOKEN \
+            -e BUILD_JOBS=2 -v "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" -w "$GITHUB_WORKSPACE" lmcurl-oldglibc ./test.sh
       - name: Build and test
-        if: env.ONLY_OK == 'true'
+        if: runner.os != 'Linux' && env.ONLY_OK == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: timeout 1800 ./test.sh
@@ -114,5 +122,5 @@ jobs:
           else
             gh release create "$GITHUB_REF_NAME" dist/lmcurl-* dist/SHA256SUMS \
               --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" \
-              --notes "Five tested platform binaries. Linux dynamically links system glibc; macOS and Windows use the documented stub until native TLS packaging is enabled. Licenses: lmcurl --notices."
+              --notes "Five tested platform binaries. Linux builds in a glibc 2.28 image and dynamically links the system glibc (2.28 or newer); macOS and Windows use the documented stub until native TLS packaging is enabled. Licenses: lmcurl --notices."
           fi

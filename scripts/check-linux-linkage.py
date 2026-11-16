@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
-"""Release policy: system glibc only, with a glibc 2.35 symbol ceiling."""
+"""Release policy: system glibc only, with a glibc symbol ceiling (GLIBC_CEILING)."""
+import os
 import pathlib
 import re
 import shutil
 import subprocess
 import sys
+
+# Highest glibc symbol version the binary may need. Releases are built in packaging/oldglibc.Dockerfile
+# (glibc 2.28), so anything newer means the binary was not built there. LMCURL_GLIBC_CEILING=2.34 loosens it
+# for a build on a newer host.
+GLIBC_CEILING = tuple(map(int, os.environ.get("LMCURL_GLIBC_CEILING", "2.28").split(".")))
 
 
 def run(*args):
@@ -24,8 +30,8 @@ def check(host):
         if not interpreter or not allowed(pathlib.Path(interpreter[1]).name):
             raise ValueError("Linux requires the system glibc dynamic loader")
         versions = [tuple(map(int, v.split("."))) for v in re.findall(r"GLIBC_([0-9]+(?:\.[0-9]+)+)", run("readelf", "--version-info", "-W", host))]
-        if versions and max(versions) > (2, 35):
-            raise ValueError("binary requires glibc newer than 2.35: " + str(max(versions)))
+        if versions and max(versions) > GLIBC_CEILING:
+            raise ValueError("binary requires glibc newer than %d.%d: %s" % (GLIBC_CEILING[0], GLIBC_CEILING[1], ".".join(map(str, max(versions)))))
     else:
         diagnostic = run("ldd", host)
         if "not found" in diagnostic:
@@ -41,7 +47,7 @@ def check(host):
     bad = [name for name in needed if not allowed(name)]
     if bad:
         raise ValueError("unexpected shared libraries: " + ", ".join(bad))
-    print("glibc >= 2.35 policy passed; dynamic dependencies: " + ", ".join(needed))
+    print("glibc <= %d.%d policy passed; dynamic dependencies: %s" % (GLIBC_CEILING[0], GLIBC_CEILING[1], ", ".join(needed)))
 
 
 if __name__ == "__main__":
