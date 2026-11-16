@@ -1,6 +1,9 @@
 name: ci
 
 on:
+  push:
+    branches: [main]
+    tags: ['v*']
   workflow_dispatch:
     inputs:
       only:
@@ -96,9 +99,45 @@ jobs:
           path: dist/
           if-no-files-found: error
 
+  ldap-integration:
+    needs: build
+    if: github.event_name != 'workflow_dispatch' || inputs.only == 'all' || inputs.only == 'linux-x64'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+      - name: Install pinned lmscript compiler
+        run: timeout 180 npm install -g @lmctl-ai/lmctl@0.2.482
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: lmcurl-linux-x64
+          path: dist
+      - name: Download lmldap release binary
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          chmod +x dist/lmcurl-linux-x64
+          mkdir -p "$RUNNER_TEMP/lmldap"
+          gh release download v0.1.0 --repo lmctl-ai/lmldap --pattern "lmldap-linux-x64" --dir "$RUNNER_TEMP/lmldap"
+          cp "$RUNNER_TEMP/lmldap/lmldap-linux-x64" "$RUNNER_TEMP/lmldap/lmldap"
+          chmod +x "$RUNNER_TEMP/lmldap/lmldap"
+      - name: Run live LDAPv3 CLI and _lmcode_ integration tests against lmldap
+        env:
+          LMLDAP_BIN: ${{ runner.temp }}/lmldap/lmldap
+          LMCURL_REQUIRE_LMLDAP: "1"
+        run: python3 scripts/test-ldap.py dist/lmcurl-linux-x64
+
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
+    needs: [build, ldap-integration]
     runs-on: ubuntu-22.04
     timeout-minutes: 10
     permissions:

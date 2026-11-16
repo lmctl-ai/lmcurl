@@ -123,6 +123,38 @@ The LLM layer supports OpenRouter, DeepSeek and Ollama, streaming/tool assembly,
 
 Linux x64 and ARM64 are full native hosts requiring glibc >=2.35; application libraries are static and permissive. macOS x64/ARM64 and Windows x64 are explicit metadata stubs and reject DSL execution.
 
+## LDAPv3 Client (CLI & `_lmcode_` Script Engine)
+
+`lmcurl` includes a pure C++17 BER/ASN.1 LDAPv3 client (`cpp/ldap_wire.hpp`) that works both directly from the command line and inside `_lmcode_` scripts:
+
+### Direct CLI (`ldap://` URLs & `lmcurl ldap` subcommands)
+
+```sh
+# curl-style RFC 4516 / REST-mapped ldap:// URLs
+lmcurl -u "cn=admin,dc=example,dc=com:secret" "ldap://127.0.0.1:3389/whoami"
+lmcurl -u "cn=admin,dc=example,dc=com:secret" "ldap://127.0.0.1:3389/dc=example,dc=com?cn,mail?sub?(objectClass=inetOrgPerson)"
+lmcurl -u "cn=admin,dc=example,dc=com:secret" "ldap://127.0.0.1:3389/compare?dn=uid=alice,dc=example,dc=com&attr=mail&value=alice@example.com"
+
+# Structured lmcurl ldap subcommands (ping, bind, whoami, search, get, add, modify, compare, del)
+lmcurl ldap ping --host 127.0.0.1 --port 3389
+lmcurl ldap whoami --host 127.0.0.1 --port 3389 --bind-dn "cn=admin,dc=example,dc=com" --password secret
+lmcurl ldap search --host 127.0.0.1 --port 3389 --bind-dn "cn=admin,dc=example,dc=com" --password secret \
+  --base-dn "dc=example,dc=com" --filter "(uid=alice)" --attrs cn,mail
+lmcurl ldap compare "uid=alice,dc=example,dc=com" mail "alice@example.com" \
+  --host 127.0.0.1 --port 3389 --bind-dn "cn=admin,dc=example,dc=com" --password secret
+```
+
+### `_lmcode_` Script Engine
+
+```lms
+p = _lmcode_ schema="schema/lmcurl.dsl.json";
+let s = curl.session("ldap://127.0.0.1:3389").basic_auth("cn=admin,dc=example,dc=com", "secret");
+s.get("/whoami").send().expect_status(200).expect_json("$.authzId", "dn:cn=admin,dc=example,dc=com");
+s.get("/search?base=dc=example,dc=com&scope=sub&filter=(uid=alice)&attrs=cn,mail").send().expect_status(200);
+s.get("/compare?dn=uid=alice,dc=example,dc=com&attr=mail&value=alice@example.com").send().expect_status(200);
+end _lmcode_
+```
+
 ## Build and verify
 
 ```sh

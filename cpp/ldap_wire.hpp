@@ -129,6 +129,22 @@ inline int64_t decode_ber_int(const std::string &v) {
   return n;
 }
 
+inline std::string unescape_filter_value(const std::string &in) {
+  std::string out;
+  for (std::size_t i = 0; i < in.size(); ++i) {
+    if (in[i] == '\\' && i + 2 < in.size() &&
+        std::isxdigit(static_cast<unsigned char>(in[i + 1])) &&
+        std::isxdigit(static_cast<unsigned char>(in[i + 2]))) {
+      int v = std::stoi(in.substr(i + 1, 2), nullptr, 16);
+      out.push_back(static_cast<char>(v));
+      i += 2;
+    } else {
+      out.push_back(in[i]);
+    }
+  }
+  return out;
+}
+
 inline std::vector<std::string> split_filter_list(const std::string &s) {
   std::vector<std::string> out;
   int depth = 0;
@@ -153,8 +169,22 @@ inline std::vector<std::string> split_filter_list(const std::string &s) {
 
 inline std::string encode_filter(std::string f) {
   f = trim(f);
-  if (f.size() >= 2 && f.front() == '(' && f.back() == ')')
-    f = trim(f.substr(1, f.size() - 2));
+  if (f.size() >= 2 && f.front() == '(' && f.back() == ')') {
+    int depth = 0;
+    bool wrapped = true;
+    for (std::size_t i = 0; i + 1 < f.size(); ++i) {
+      if (f[i] == '(')
+        ++depth;
+      else if (f[i] == ')')
+        --depth;
+      if (depth == 0) {
+        wrapped = false;
+        break;
+      }
+    }
+    if (wrapped)
+      f = trim(f.substr(1, f.size() - 2));
+  }
   if (f.empty())
     f = "objectClass=*";
   if (f.front() == '&' || f.front() == '|') {
@@ -166,6 +196,21 @@ inline std::string encode_filter(std::string f) {
   }
   if (f.front() == '!') {
     return ber_tag(0xa2, encode_filter(f.substr(1)));
+  }
+  if (auto ge = f.find(">="); ge != std::string::npos) {
+    return ber_seq(
+        {ber_octet(trim(f.substr(0, ge))), ber_octet(unescape_filter_value(f.substr(ge + 2)))},
+        0xa5);
+  }
+  if (auto le = f.find("<="); le != std::string::npos) {
+    return ber_seq(
+        {ber_octet(trim(f.substr(0, le))), ber_octet(unescape_filter_value(f.substr(le + 2)))},
+        0xa6);
+  }
+  if (auto ap = f.find("~="); ap != std::string::npos) {
+    return ber_seq(
+        {ber_octet(trim(f.substr(0, ap))), ber_octet(unescape_filter_value(f.substr(ap + 2)))},
+        0xa8);
   }
   auto eq = f.find('=');
   if (eq == std::string::npos)
@@ -191,11 +236,11 @@ inline std::string encode_filter(std::string f) {
       if (parts[i].empty())
         continue;
       uint8_t stag = (i == 0) ? 0x80 : (i == parts.size() - 1 ? 0x82 : 0x81);
-      sub_items.push_back(ber_octet(parts[i], stag));
+      sub_items.push_back(ber_octet(unescape_filter_value(parts[i]), stag));
     }
     return ber_seq({ber_octet(attr), ber_seq(sub_items)}, 0xa4);
   }
-  return ber_seq({ber_octet(attr), ber_octet(val)}, 0xa3);
+  return ber_seq({ber_octet(attr), ber_octet(unescape_filter_value(val))}, 0xa3);
 }
 
 inline std::string url_decode(const std::string &in) {
@@ -218,21 +263,40 @@ inline std::string url_decode(const std::string &in) {
 struct ParsedLdapUrl {
   std::string host = "127.0.0.1";
   int port = 389;
+  std::string user_dn;
+  std::string user_pw;
   std::string path_dn;
   std::vector<std::string> attrs;
   std::string scope = "base";
   std::string filter = "(objectClass=*)";
+  std::string compare_attr;
+  std::string compare_val;
   bool is_search_endpoint = false;
   bool is_ping_endpoint = false;
   bool is_bind_endpoint = false;
+  bool is_whoami_endpoint = false;
+  bool is_compare_endpoint = false;
 };
 
 inline ParsedLdapUrl parse_ldap_url(const std::string &target) {
   ParsedLdapUrl u;
-  std::string rest = target.substr(7); // after "ldap://"
+  std::string rest = target.substr(target.find("://") + 3);
   auto slash = rest.find('/');
-  std::string hostport = slash == std::string::npos ? rest : rest.substr(0, slash);
+  std::string authority = slash == std::string::npos ? rest : rest.substr(0, slash);
   std::string tail = slash == std::string::npos ? "" : rest.substr(slash + 1);
+  auto at = authority.rfind('@');
+  std::string hostport = authority;
+  if (at != std::string::npos) {
+    std::string userinfo = authority.substr(0, at);
+    hostport = authority.substr(at + 1);
+    auto ucolon = userinfo.find(':');
+    if (ucolon != std::string::npos) {
+      u.user_dn = url_decode(userinfo.substr(0, ucolon));
+      u.user_pw = url_decode(userinfo.substr(ucolon + 1));
+    } else {
+      u.user_dn = url_decode(userinfo);
+    }
+  }
   auto colon = hostport.rfind(':');
   if (colon != std::string::npos) {
     u.host = hostport.substr(0, colon);
@@ -248,6 +312,10 @@ inline ParsedLdapUrl parse_ldap_url(const std::string &target) {
     u.is_ping_endpoint = (raw_path == "ping" || (raw_path.empty() && query.empty()));
   } else if (raw_path == "bind") {
     u.is_bind_endpoint = true;
+  } else if (raw_path == "whoami") {
+    u.is_whoami_endpoint = true;
+  } else if (raw_path == "compare") {
+    u.is_compare_endpoint = true;
   } else if (raw_path == "search" || raw_path == "entries") {
     u.is_search_endpoint = true;
     u.scope = "sub";
@@ -259,25 +327,38 @@ inline ParsedLdapUrl parse_ldap_url(const std::string &target) {
   }
 
   if (!query.empty()) {
-    if (query.find('=') != std::string::npos && query.find('?') == std::string::npos &&
-        query.front() != '(') {
-      // HTTP-style query string ?base=...&filter=...&scope=...
-      u.is_search_endpoint = true;
-      u.scope = "sub";
+    if (u.is_compare_endpoint ||
+        (query.find('=') != std::string::npos && query.find('?') == std::string::npos &&
+         query.front() != '(')) {
+      if (!u.is_compare_endpoint) {
+        u.is_search_endpoint = true;
+        u.scope = "sub";
+      }
       std::size_t pos = 0;
       while (pos <= query.size()) {
         auto amp = query.find('&', pos);
-        std::string kv = query.substr(pos, amp == std::string::npos ? std::string::npos : amp - pos);
+        std::string kv =
+            query.substr(pos, amp == std::string::npos ? std::string::npos : amp - pos);
         auto eq = kv.find('=');
         if (eq != std::string::npos) {
           std::string k = url_decode(kv.substr(0, eq));
           std::string v = url_decode(kv.substr(eq + 1));
-          if (k == "base")
+          if (k == "base" || k == "dn")
             u.path_dn = v;
           else if (k == "filter")
             u.filter = v;
           else if (k == "scope")
             u.scope = v;
+          else if (k == "attrs") {
+            std::istringstream ss(v);
+            std::string a;
+            while (std::getline(ss, a, ','))
+              if (!a.empty())
+                u.attrs.push_back(a);
+          } else if (k == "attr")
+            u.compare_attr = v;
+          else if (k == "value")
+            u.compare_val = v;
         }
         if (amp == std::string::npos)
           break;
@@ -341,6 +422,19 @@ inline bool recv_message(int fd, std::string &buf, BerNode &msg) {
   }
 }
 
+inline void append_mod_items(std::vector<std::string> &changes, int64_t op_enum,
+                             const std::string &attr_name, const Json &val_node) {
+  std::vector<std::string> vals;
+  if (val_node.is_array()) {
+    for (const auto &v : val_node)
+      vals.push_back(ber_octet(v.is_string() ? v.get<std::string>() : v.dump()));
+  } else if (!val_node.is_null()) {
+    vals.push_back(
+        ber_octet(val_node.is_string() ? val_node.get<std::string>() : val_node.dump()));
+  }
+  changes.push_back(ber_seq({ber_enum(op_enum), ber_seq({ber_octet(attr_name), ber_set(vals)})}));
+}
+
 inline Response perform_ldap(Runtime *runtime, const Request &request, const std::string &target) {
   auto started = Clock::now();
   Response resp;
@@ -350,6 +444,9 @@ inline Response perform_ldap(Runtime *runtime, const Request &request, const std
   resp.headers["content-type"] = "application/json";
 
   ParsedLdapUrl u = parse_ldap_url(target);
+  if (!u.user_pw.empty())
+    runtime->secret(u.user_pw);
+
   int fd = ::socket(AF_INET, SOCK_STREAM, 0);
   if (fd < 0) {
     resp.error = "socket creation failed";
@@ -414,8 +511,8 @@ inline Response perform_ldap(Runtime *runtime, const Request &request, const std
     return true;
   };
 
-  std::string bind_dn = request.auth_user;
-  std::string bind_pw = request.auth_password;
+  std::string bind_dn = !request.auth_user.empty() ? request.auth_user : u.user_dn;
+  std::string bind_pw = !request.auth_password.empty() ? request.auth_password : u.user_pw;
   if (u.is_bind_endpoint && !request.body.empty()) {
     auto j = parse_json(request.body, false);
     if (j.is_object()) {
@@ -461,7 +558,50 @@ inline Response perform_ldap(Runtime *runtime, const Request &request, const std
       }
     }
 
-    if (request.verb == "GET" || request.verb == "HEAD") {
+    if (u.is_whoami_endpoint) {
+      std::string ext_op = ber_seq({ber_octet("1.3.6.1.4.1.4203.1.11.3", 0x80)}, 0x77);
+      send_all(fd, ber_seq({ber_int(msg_id++), ext_op}));
+      BerNode reply;
+      if (!recv_message(fd, rx_buf, reply))
+        throw dslvm::Error("LDAP whoami receive failed");
+      auto parts = read_ber_children(reply.value);
+      auto rparts = parts.size() >= 2 ? read_ber_children(parts[1].value) : std::vector<BerNode>{};
+      int64_t code = rparts.empty() ? 80 : decode_ber_int(rparts[0].value);
+      std::string authz = bind_dn.empty() ? "anonymous" : ("dn:" + bind_dn);
+      for (std::size_t i = 3; i < rparts.size(); ++i) {
+        if (rparts[i].tag == 0x8b && !rparts[i].value.empty())
+          authz = rparts[i].value;
+      }
+      resp.headers["x-ldap-result-code"] = std::to_string(code);
+      resp.status = (code == 0) ? 200 : 400;
+      resp.body = Json({{"ok", code == 0}, {"result", {{"authzId", authz}}}}).dump();
+    } else if (u.is_compare_endpoint) {
+      std::string cmp_op =
+          ber_seq({ber_octet(u.path_dn),
+                   ber_seq({ber_octet(u.compare_attr), ber_octet(u.compare_val)})},
+                  0x6e);
+      send_all(fd, ber_seq({ber_int(msg_id++), cmp_op}));
+      BerNode reply;
+      if (!recv_message(fd, rx_buf, reply))
+        throw dslvm::Error("LDAP compare receive failed");
+      auto parts = read_ber_children(reply.value);
+      auto rparts = parts.size() >= 2 ? read_ber_children(parts[1].value) : std::vector<BerNode>{};
+      int64_t code = rparts.empty() ? 80 : decode_ber_int(rparts[0].value);
+      resp.headers["x-ldap-result-code"] = std::to_string(code);
+      if (code == 6 || code == 5) {
+        resp.status = 200;
+        resp.body = Json({{"ok", true},
+                          {"result",
+                           {{"match", code == 6},
+                            {"dn", u.path_dn},
+                            {"attr", u.compare_attr},
+                            {"value", u.compare_val}}}})
+                        .dump();
+      } else {
+        resp.status = (code == 32) ? 404 : 400;
+        resp.body = Json({{"ok", false}, {"error", "LDAP compare failed"}}).dump();
+      }
+    } else if (request.verb == "GET" || request.verb == "HEAD") {
       int64_t scope_val = (u.scope == "base") ? 0 : (u.scope == "one" ? 1 : 2);
       std::vector<std::string> attr_items;
       for (const auto &a : u.attrs)
@@ -530,7 +670,7 @@ inline Response perform_ldap(Runtime *runtime, const Request &request, const std
         resp.status = 404;
         Json out = {{"ok", false}, {"error", "No such object"}};
         resp.body = out.dump();
-      } else if (done_code != 0) {
+      } else if (done_code != 0 && done_code != 4) {
         resp.status = 400;
         Json out = {{"ok", false}, {"error", done_diag.empty() ? "LDAP search error" : done_diag}};
         resp.body = out.dump();
@@ -590,20 +730,34 @@ inline Response perform_ldap(Runtime *runtime, const Request &request, const std
       if (!j.is_object())
         throw dslvm::Error("LDAP POST body must be a JSON object of modifications");
       std::vector<std::string> changes;
-      for (auto it = j.begin(); it != j.end(); ++it) {
-        if (lower(it.key()) == "dn")
-          continue;
-        std::vector<std::string> vals;
-        if (it.value().is_array()) {
-          for (const auto &v : it.value())
-            vals.push_back(ber_octet(v.is_string() ? v.get<std::string>() : v.dump()));
-        } else if (!it.value().is_null()) {
-          vals.push_back(
-              ber_octet(it.value().is_string() ? it.value().get<std::string>() : it.value().dump()));
+      bool explicit_ops = (j.contains("add") || j.contains("replace") || j.contains("delete"));
+      if (explicit_ops) {
+        if (j.contains("add") && j["add"].is_object()) {
+          for (auto it = j["add"].begin(); it != j["add"].end(); ++it)
+            append_mod_items(changes, 0, it.key(), it.value());
         }
-        int64_t op_enum = vals.empty() ? 1 : 2;
-        changes.push_back(
-            ber_seq({ber_enum(op_enum), ber_seq({ber_octet(it.key()), ber_set(vals)})}));
+        if (j.contains("replace") && j["replace"].is_object()) {
+          for (auto it = j["replace"].begin(); it != j["replace"].end(); ++it)
+            append_mod_items(changes, 2, it.key(), it.value());
+        }
+        if (j.contains("delete")) {
+          if (j["delete"].is_array()) {
+            for (const auto &k : j["delete"])
+              if (k.is_string())
+                changes.push_back(ber_seq(
+                    {ber_enum(1), ber_seq({ber_octet(k.get<std::string>()), ber_set({})})}));
+          } else if (j["delete"].is_object()) {
+            for (auto it = j["delete"].begin(); it != j["delete"].end(); ++it)
+              append_mod_items(changes, 1, it.key(), it.value());
+          }
+        }
+      } else {
+        for (auto it = j.begin(); it != j.end(); ++it) {
+          if (lower(it.key()) == "dn")
+            continue;
+          int64_t op_enum = it.value().is_null() ? 1 : 2;
+          append_mod_items(changes, op_enum, it.key(), it.value());
+        }
       }
       std::string mod_op = ber_seq({ber_octet(u.path_dn), ber_seq(changes)}, 0x66);
       send_all(fd, ber_seq({ber_int(msg_id++), mod_op}));
