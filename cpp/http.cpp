@@ -1,4 +1,5 @@
 #include "core.hpp"
+#include "ldap_wire.hpp"
 #include <curl/curl.h>
 #include <algorithm>
 #include <cmath>
@@ -191,13 +192,16 @@ Response Session::perform(const Request &input) const {
       request.max_bytes < 1 || request.max_bytes > 8 * 1024 * 1024)
     throw dslvm::Error("request timeout/retry/size limits invalid");
   auto target = request.url;
-  if (target.rfind("http://", 0) != 0 && target.rfind("https://", 0) != 0)
+  if (target.rfind("http://", 0) != 0 && target.rfind("https://", 0) != 0 &&
+      target.rfind("ldap://", 0) != 0)
     target = base + (base.size() && base.back() == '/' && target.size() && target.front() == '/'
                          ? target.substr(1)
                          : target);
   text(target, 16384, "URL");
+  if (target.rfind("ldap://", 0) == 0)
+    return ldap_wire::perform_ldap(runtime, request, target);
   if (target.rfind("http://", 0) != 0 && target.rfind("https://", 0) != 0)
-    throw dslvm::Error("only HTTP and HTTPS URLs are supported");
+    throw dslvm::Error("only HTTP, HTTPS and LDAP URLs are supported");
   {
     std::unique_ptr<CURLU, decltype(&curl_url_cleanup)> u(curl_url(), curl_url_cleanup);
     if (u && curl_url_set(u.get(), CURLUPART_URL, target.c_str(), 0) == CURLUE_OK) {

@@ -65,6 +65,11 @@ fn math_sqrt(float) -> float
 fn math_sqrt(int) -> int
 fn print(string) -> void
 fn println(string) -> void
+fn rest_cli(StrList) -> string
+fn rest_config(string, string) -> void
+fn rest_route(string, string, string) -> void
+fn rest_serve() -> void
+fn rest_stop() -> void
 fn str_base64_decode(string) -> string
 fn str_base64_encode(string) -> string
 fn str_contains(string, string) -> bool
@@ -299,6 +304,21 @@ method Response.status() -> int
 method Response.time(string) -> float
 method Response.url() -> string
 method Response.xpath(string) -> Query
+method RestExchange.body() -> string
+method RestExchange.get(string) -> string
+method RestExchange.has_header(string) -> bool
+method RestExchange.has_query(string) -> bool
+method RestExchange.header(string) -> string
+method RestExchange.increment(string) -> int
+method RestExchange.json(string) -> void
+method RestExchange.method() -> string
+method RestExchange.param(string) -> string
+method RestExchange.path() -> string
+method RestExchange.query(string) -> string
+method RestExchange.send(string) -> void
+method RestExchange.set(string, string) -> void
+method RestExchange.set_header(string, string) -> void
+method RestExchange.status(int) -> void
 method Result.contains(string) -> bool
 method Result.equals(string) -> bool
 method Result.estimated_cost() -> float
