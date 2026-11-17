@@ -7,3 +7,4 @@
 - [05-open-items.md](05-open-items.md): current unsupported or incomplete areas.
 - [07-invocation-envelope.md](07-invocation-envelope.md): run_lmcode, the redacted frame, exit codes, dry mode and how tests capture programs.
 - [06-examples-and-release.md](06-examples-and-release.md): reproducible examples, live evidence and published artifacts.
+- [08-ldap-and-std-rest-cli.md](08-ldap-and-std-rest-cli.md): LDAPv3 direct CLI + `_lmcode_` client and standard `lmcode` REST/CLI interfaces (`RestGet`, `CliCommand`, `CliOption`, `rest_cli`).
