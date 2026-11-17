@@ -121,7 +121,7 @@ Typed `Session`, `Request`, `Response`, `Query`, `Suite`, `Test`, `Report`, `Loa
 
 The LLM layer supports OpenRouter, DeepSeek and Ollama, streaming/tool assembly, JSON mode, sampling, model matrices and cassette replay. Live calls require `LMCURL_LIVE=1` and are forbidden in CI. Pre-call cost reservations default to $0.02, with a hard $0.25 process ceiling. Known key values and credential-shaped strings are redacted from exported artifacts. The original [live evidence](evidence/live-llm-v010.json) records four provider paths with total estimated cost $0.00000360, excluding Ollama subscription/infrastructure costs; its cloud Ollama call exhausted the small output allowance without visible text. No live calls were needed for these new examples.
 
-Linux x64 and ARM64 are full native hosts requiring glibc >=2.35; application libraries are static and permissive. macOS x64/ARM64 and Windows x64 are explicit metadata stubs and reject DSL execution.
+Linux x64 and ARM64 are full native hosts requiring glibc >=2.28; application libraries are static and permissive. macOS x64/ARM64 and Windows x64 are explicit metadata stubs and reject DSL execution.
 
 ## LDAPv3 Client (CLI & `_lmcode_` Script Engine)
 

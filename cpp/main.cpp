@@ -319,7 +319,7 @@ int main(int argc, char **argv) {
              "  lmcurl ldap <ping|bind|whoami|search|get|add|modify|compare|del> [options]\n"
              "LMCURL_MAX_MEMORY_MB: positive whole MiB (default 4096).\n"
              "LMCURL_LIVE=1 enables paid LLM calls; LMCURL_MAX_COST_USD defaults 0.02, hard run ceiling 0.25.\n"
-             "Linux requires glibc >=2.35; all other libraries are static.\n";
+             "Linux requires glibc >=2.28; all other libraries are static.\n";
       return 0;
     }
     // Check for direct CLI mode (`lmcurl ldap ...` or `lmcurl [flags] <ldap://...|http://...|https://...>`)
