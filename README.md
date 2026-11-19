@@ -2,6 +2,8 @@
 
 Download with upstream libcurl, parse with lmhtml, and turn asserted results into reports and pictures.
 
+**Documentation:** [Quick reference](https://www.lmctl.com/tools/lmcurl/) · [LLM skill](https://www.lmctl.com/tools/lmcurl/skill.html) · [Guide](https://www.lmctl.com/tools/lmcurl/guide.html) · [Reference](https://www.lmctl.com/tools/lmcurl/reference.html)
+
 | Mirror parsed HTML, stylesheet, script and image dependencies | Poll until the price is at most 20 USD and stock is positive |
 | --- | --- |
 | ![Mirror parsed HTML, stylesheet, script and image dependencies](docs/images/web_site_mirror.png) | ![Poll until the price is at most 20 USD and stock is positive](docs/images/web_price_watcher.png) |
